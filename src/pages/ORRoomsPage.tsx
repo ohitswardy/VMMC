@@ -37,10 +37,6 @@ export default function ORRoomsPage() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">OR Rooms</h1>
           <p className="text-xs md:text-sm text-gray-500 mt-0.5">Configure and manage operating rooms</p>
         </div>
-        <Button size="sm" icon={<Plus className="w-4 h-4" />} onClick={openAddModal}>
-          <span className="hidden sm:inline">Add OR Room</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
       </div>
 
       {/* Rooms Grid */}
@@ -79,6 +75,11 @@ export default function ORRoomsPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* Add Button */}
+      <Button className="w-full" icon={<Plus className="w-4 h-4" />} onClick={openAddModal}>
+        Add OR Room
+      </Button>
 
       {/* Add/Edit Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingRoom ? 'Edit OR Room' : 'Add OR Room'} size="md">

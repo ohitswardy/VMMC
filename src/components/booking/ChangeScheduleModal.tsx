@@ -2,7 +2,10 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { Input, Select, Textarea } from '../ui/FormFields';
+import { Input, Textarea } from '../ui/FormFields';
+import { CustomSelect } from '../ui/CustomSelect';
+import { DatePicker } from '../ui/DatePicker';
+import { TimePicker } from '../ui/TimePicker';
 import { useAuthStore } from '../../stores/authStore';
 import { DEPARTMENTS, CHANGE_REASONS, IM_SUBSPECIALTIES } from '../../lib/constants';
 import { canModifyBooking, generateId } from '../../lib/utils';
@@ -83,10 +86,10 @@ export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props)
     <Modal isOpen={isOpen} onClose={onClose} title="Change in OR Schedule" size="xl">
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Department */}
-        <Select
+        <CustomSelect
           label="Department"
           value={form.department_id}
-          onChange={(e) => updateField('department_id', e.target.value)}
+          onChange={(val) => updateField('department_id', val)}
           options={DEPARTMENTS.map((d) => ({ value: d.id, label: d.name }))}
           required
         />
@@ -94,10 +97,10 @@ export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props)
         {/* IM Subspecialty (conditional) */}
         {form.department_id === 'GI' || form.department_id === 'PULMO' || form.department_id === 'CARDIAC' ? (
           <div className="space-y-3">
-            <Select
+            <CustomSelect
               label="For Department of IM, choose subspecialty"
               value={form.im_subspecialty}
-              onChange={(e) => updateField('im_subspecialty', e.target.value)}
+              onChange={(val) => updateField('im_subspecialty', val)}
               options={IM_SUBSPECIALTIES.map((s) => ({ value: s, label: s }))}
               placeholder="Select subspecialty"
             />
@@ -114,18 +117,16 @@ export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props)
 
         {/* Date & Time */}
         <div className="grid grid-cols-2 gap-4">
-          <Input
+          <DatePicker
             label="OR Date"
-            type="date"
             value={form.new_date}
-            onChange={(e) => updateField('new_date', e.target.value)}
+            onChange={(val) => updateField('new_date', val)}
             required
           />
-          <Input
+          <TimePicker
             label="Preferred Time"
-            type="time"
             value={form.new_preferred_time}
-            onChange={(e) => updateField('new_preferred_time', e.target.value)}
+            onChange={(val) => updateField('new_preferred_time', val)}
             required
           />
         </div>

@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/authStore';
 import { DEPARTMENTS, BOOKING_STATUSES } from '../lib/constants';
 import { getDeptColor, getDeptName, formatTime } from '../lib/utils';
 import StatusBadge from '../components/ui/StatusBadge';
+import { CustomSelect } from '../components/ui/CustomSelect';
 import { useBookingsStore } from '../stores/appStore';
 
 const fadeUp = {
@@ -59,40 +60,39 @@ export default function BookingsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-[10px] border border-gray-200 px-4 py-3 flex flex-col sm:flex-row flex-wrap gap-2.5">
-        <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+      <div className="bg-white rounded-[10px] border border-gray-200 px-3 md:px-4 py-3 space-y-2 md:space-y-0 md:flex md:flex-wrap md:gap-3">
+        <div className="relative flex-1 min-w-0 md:min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search patient, procedure..."
-            className="input-base !pl-9"
+            className="w-full py-2.5 md:py-2 input-base"
+            style={{ paddingLeft: '2.25rem' }}
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="flex flex-wrap gap-2">
           {isAdmin && (
-            <select
+            <CustomSelect
               value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              className="input-base !w-auto flex-shrink-0"
-            >
-              <option value="all">All Depts</option>
-              {DEPARTMENTS.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
+              onChange={(val) => setDeptFilter(val)}
+              options={[
+                { value: 'all', label: 'All Depts' },
+                ...DEPARTMENTS.map((d) => ({ value: d.id, label: d.name })),
+              ]}
+              className="shrink-0"
+            />
           )}
-          <select
+          <CustomSelect
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="input-base !w-auto flex-shrink-0"
-          >
-            <option value="all">All Status</option>
-            {BOOKING_STATUSES.map((s) => (
-              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-            ))}
-          </select>
+            onChange={(val) => setStatusFilter(val)}
+            options={[
+              { value: 'all', label: 'All Status' },
+              ...BOOKING_STATUSES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })),
+            ]}
+            className="shrink-0"
+          />
         </div>
       </div>
 

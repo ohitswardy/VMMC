@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Bell, CheckCheck } from 'lucide-react';
 import { MOCK_NOTIFICATIONS } from '../lib/mockData';
 import Button from '../components/ui/Button';
+import { CustomSelect } from '../components/ui/CustomSelect';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
@@ -45,17 +46,17 @@ export default function NotificationsPage() {
           <p className="text-xs md:text-sm text-gray-500 mt-0.5">{unread} unread notification{unread !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex gap-2">
-          <select
+          <CustomSelect
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2.5 md:py-1.5 input-base text-base md:text-sm"
-          >
-            <option value="all">All</option>
-            <option value="unread">Unread</option>
-            <option value="new_request">Requests</option>
-            <option value="approval">Approvals</option>
-            <option value="emergency_alert">Emergencies</option>
-          </select>
+            onChange={(val) => setFilterType(val)}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'unread', label: 'Unread' },
+              { value: 'new_request', label: 'Requests' },
+              { value: 'approval', label: 'Approvals' },
+              { value: 'emergency_alert', label: 'Emergencies' },
+            ]}
+          />
           {unread > 0 && (
             <Button variant="secondary" size="sm" icon={<CheckCheck className="w-4 h-4" />} onClick={markAllRead}>
               Mark All Read

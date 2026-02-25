@@ -5,6 +5,7 @@ import { format, subDays, eachDayOfInterval } from 'date-fns';
 import { MOCK_BOOKINGS, MOCK_OR_ROOMS } from '../lib/mockData';
 import { getDeptName, getDeptColor, getDeptBg, formatTime } from '../lib/utils';
 import Button from '../components/ui/Button';
+import { DatePicker } from '../components/ui/DatePicker';
 import toast from 'react-hot-toast';
 
 export default function DocumentsPage() {
@@ -62,13 +63,11 @@ export default function DocumentsPage() {
       {/* ─── Mobile: Date selector as horizontal scroll chips ─── */}
       <div className="md:hidden">
         <div className="bg-white rounded-[10px] border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar className="w-4 h-4 text-accent-500" />
-            <input
-              type="date"
+          <div className="mb-3">
+            <DatePicker
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="flex-1 input-base"
+              onChange={(val) => setSelectedDate(val)}
+              placeholder="Select date"
             />
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 scroll-snap-x">
@@ -101,11 +100,10 @@ export default function DocumentsPage() {
               <Calendar className="w-4 h-4 text-accent-500" />
               Select Date
             </h3>
-            <input
-              type="date"
+            <DatePicker
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full input-base"
+              onChange={(val) => setSelectedDate(val)}
+              placeholder="Select date"
             />
           </div>
           <div className="bg-white rounded-[10px] border border-gray-200 p-4">

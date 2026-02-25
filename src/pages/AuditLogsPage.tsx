@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Shield, Search } from 'lucide-react';
+import { DatePicker } from '../components/ui/DatePicker';
+import { CustomSelect } from '../components/ui/CustomSelect';
 import { MOCK_AUDIT_LOGS, MOCK_USERS } from '../lib/mockData';
 
 export default function AuditLogsPage() {
@@ -54,42 +56,42 @@ export default function AuditLogsPage() {
       {/* Filters */}
       <div className="bg-white rounded-[10px] border border-gray-200 px-3 md:px-4 py-3 space-y-2 md:space-y-0 md:flex md:flex-wrap md:gap-3">
         <div className="relative flex-1 min-w-0 md:min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search actions..."
-            className="w-full pl-9 pr-4 py-2.5 md:py-2 input-base"
+            className="w-full py-2.5 md:py-2 input-base"
+            style={{ paddingLeft: '2.25rem' }}
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto">
-          <input
-            type="date"
+        <div className="flex flex-wrap gap-2">
+          <DatePicker
             value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="flex-shrink-0 input-base"
+            onChange={(val) => setDateFilter(val)}
+            placeholder="Filter by date"
           />
-          <select
+          <CustomSelect
             value={userFilter}
-            onChange={(e) => setUserFilter(e.target.value)}
-            className="flex-shrink-0 input-base"
-          >
-            <option value="">All Users</option>
-            {MOCK_USERS.map((u) => (
-              <option key={u.id} value={u.id}>{u.full_name}</option>
-            ))}
-          </select>
-          <select
+            onChange={(val) => setUserFilter(val)}
+            options={[
+              { value: '', label: 'All Users' },
+              ...MOCK_USERS.map((u) => ({ value: u.id, label: u.full_name })),
+            ]}
+            className="shrink-0"
+          />
+          <CustomSelect
             value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-            className="flex-shrink-0 input-base"
-          >
-            <option value="">All Actions</option>
-            <option value="booking">Booking</option>
-            <option value="user">User</option>
-            <option value="room">Room</option>
-          </select>
+            onChange={(val) => setActionFilter(val)}
+            options={[
+              { value: '', label: 'All Actions' },
+              { value: 'booking', label: 'Booking' },
+              { value: 'user', label: 'User' },
+              { value: 'room', label: 'Room' },
+            ]}
+            className="shrink-0"
+          />
         </div>
       </div>
 

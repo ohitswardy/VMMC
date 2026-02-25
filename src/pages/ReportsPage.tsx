@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
-  BarChart3, Clock, TrendingUp, AlertTriangle, Calendar,
-  PieChart, Activity
+  BarChart3, Clock, ChartLine,
+  PieChart, ArrowUpRight, ArrowDownRight, Siren, Ban, BriefcaseMedical
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RePieChart, Pie, Cell, Legend
+  PieChart as RePieChart, Pie, Cell, Legend,
+  AreaChart, Area, LineChart, Line
 } from 'recharts';
 import { MOCK_BOOKINGS, MOCK_OR_ROOMS } from '../lib/mockData';
 import { getDeptColor, getDeptName, calcUtilization } from '../lib/utils';
@@ -89,36 +90,119 @@ export default function ReportsPage() {
         <p className="text-xs md:text-sm text-gray-500 mt-0.5">OR performance insights and statistics</p>
       </div>
 
-      {/* Summary Cards */}
-      {/* Stats — horizontal scroll on mobile */}
-      <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-4 scroll-snap-x">
-        {[
-          { label: 'Avg Utilization', value: `${stats.avgUtilization}%`, icon: TrendingUp, color: 'text-accent-500', bg: 'bg-accent-50' },
-          { label: 'Total Cases', value: stats.totalCases, icon: Calendar, color: 'text-blue-500', bg: 'bg-blue-50' },
-          { label: 'Cancellation', value: `${stats.cancellationRate}%`, icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50' },
-          { label: 'Emergency', value: `${stats.emergencyRatio}%`, icon: Activity, color: 'text-red-500', bg: 'bg-red-50' },
-        ].map((card, i) => {
-          const Icon = card.icon;
-          return (
-            <motion.div
-              key={card.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06 }}
-              className="flex-shrink-0 w-[140px] md:w-auto bg-white rounded-[10px] border border-gray-200 p-4 md:p-5 scroll-snap-start"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 md:w-10 md:h-10 rounded-[8px] ${card.bg} flex items-center justify-center`}>
-                  <Icon className={`w-4 h-4 md:w-5 md:h-5 ${card.color}`} />
-                </div>
-                <div>
-                  <p className="text-xl md:text-2xl font-bold text-gray-900">{card.value}</p>
-                  <p className="text-[10px] md:text-[11px] text-gray-500">{card.label}</p>
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
+      {/* ── UntitledUI-style Metric Cards ── */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        {/* Card 1 — Avg Utilization (area sparkline) */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}
+          className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-medium text-gray-500">Avg Utilization</p>
+<ChartLine className="w-5 h-5 text-teal-900 shrink-0" />
+          </div>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.avgUtilization}%</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
+              <ArrowUpRight className="w-3 h-3" /> 4.2%
+            </span>
+            <span className="text-[10px] text-gray-400">vs last week</span>
+          </div>
+          <div className="mt-3 -mx-1 -mb-1">
+            <ResponsiveContainer width="100%" height={48}>
+              <AreaChart data={utilizationData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="utilizationFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="utilization" stroke="#6366f1" strokeWidth={2}
+                  fill="url(#utilizationFill)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Card 2 — Total Cases (mini bar chart) */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
+          className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-medium text-gray-500">Total Cases</p>
+<BriefcaseMedical className="w-5 h-5 text-teal-900 shrink-0" />
+          </div>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.totalCases}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
+              <ArrowUpRight className="w-3 h-3" /> 12%
+            </span>
+            <span className="text-[10px] text-gray-400">vs last week</span>
+          </div>
+          <div className="mt-3 -mx-1 -mb-1">
+            <ResponsiveContainer width="100%" height={48}>
+              <BarChart data={utilizationData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <Bar dataKey="cases" fill="#3b82f6" radius={[3, 3, 0, 0]} opacity={0.85} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Card 3 — Cancellation Rate (line sparkline) */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+          className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-medium text-gray-500">Cancellation</p>
+<Ban className="w-5 h-5 text-teal-900 shrink-0" />
+          </div>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.cancellationRate}%</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
+              <ArrowDownRight className="w-3 h-3" /> 2.1%
+            </span>
+            <span className="text-[10px] text-gray-400">vs last week</span>
+          </div>
+          <div className="mt-3 -mx-1 -mb-1">
+            <ResponsiveContainer width="100%" height={48}>
+              <AreaChart data={[
+                { d: 1, v: 5 }, { d: 2, v: 3 }, { d: 3, v: 4 }, { d: 4, v: 2 },
+                { d: 5, v: 3 }, { d: 6, v: 1 }, { d: 7, v: 0 },
+              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="cancelFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="v" stroke="#f59e0b" strokeWidth={2}
+                  fill="url(#cancelFill)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Card 4 — Emergency Ratio (stepped line) */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}
+          className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-medium text-gray-500">Emergency</p>
+<Siren className="w-5 h-5 text-teal-900 shrink-0" />
+          </div>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.emergencyRatio}%</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-500">
+              — 0%
+            </span>
+            <span className="text-[10px] text-gray-400">no change</span>
+          </div>
+          <div className="mt-3 -mx-1 -mb-1">
+            <ResponsiveContainer width="100%" height={48}>
+              <LineChart data={[
+                { d: 1, v: 0 }, { d: 2, v: 1 }, { d: 3, v: 0 }, { d: 4, v: 0 },
+                { d: 5, v: 1 }, { d: 6, v: 0 }, { d: 7, v: 0 },
+              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <Line type="stepAfter" dataKey="v" stroke="#ef4444" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
       </div>
 
       {/* Charts Grid */}
@@ -164,14 +248,14 @@ export default function ReportsPage() {
             <PieChart className="w-4 h-4 text-accent-500" />
             By Department
           </h3>
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={280}>
             <RePieChart>
               <Pie
                 data={deptData}
                 cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
+                cy="45%"
+                innerRadius={50}
+                outerRadius={85}
                 paddingAngle={3}
                 dataKey="value"
               >
@@ -181,7 +265,9 @@ export default function ReportsPage() {
               </Pie>
               <Tooltip />
               <Legend
-                formatter={(value) => <span className="text-xs text-gray-600">{value}</span>}
+                wrapperStyle={{ fontSize: 11, lineHeight: '20px' }}
+                iconSize={10}
+                formatter={(value) => <span className="text-[11px] text-gray-600">{value}</span>}
               />
             </RePieChart>
           </ResponsiveContainer>
@@ -221,15 +307,26 @@ export default function ReportsPage() {
           className="bg-white rounded-[10px] border border-gray-200 p-4 md:p-6 lg:col-span-2"
         >
           <h3 className="text-xs md:text-sm font-semibold text-gray-900 mb-3 md:mb-4">Status Distribution</h3>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={280}>
             <RePieChart>
-              <Pie data={statusData} cx="50%" cy="50%" outerRadius={90} dataKey="value" label>
+              <Pie
+                data={statusData}
+                cx="50%"
+                cy="45%"
+                outerRadius={80}
+                dataKey="value"
+                label={({ name, value }) => `${value}`}
+                labelLine={false}
+              >
                 {statusData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
-              <Legend />
+              <Legend
+                wrapperStyle={{ fontSize: 11, lineHeight: '20px' }}
+                iconSize={10}
+              />
             </RePieChart>
           </ResponsiveContainer>
         </motion.div>

@@ -2,8 +2,11 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   ClipboardList, Clock, Calendar, CheckCircle,
-  Search, ChevronRight
+  Search, ChevronRight, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
+import {
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line
+} from 'recharts';
 import { format } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
 import { MOCK_BOOKINGS, MOCK_OR_ROOMS } from '../lib/mockData';
@@ -11,6 +14,7 @@ import { BOOKING_STATUSES } from '../lib/constants';
 import { getDeptColor, getDeptBg, getDeptName, formatTime } from '../lib/utils';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
+import { CustomSelect } from '../components/ui/CustomSelect';
 
 const fadeUp = {
   initial: { opacity: 0, y: 12 },
@@ -52,13 +56,6 @@ export default function DashboardPage() {
     return result;
   }, [bookings, statusFilter, searchTerm, isAdmin, user]);
 
-  const statCards = [
-    { label: "Today's Cases", value: stats.total, icon: Calendar, color: 'text-accent-600', bg: 'bg-accent-50' },
-    { label: 'Pending', value: stats.pending, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Ongoing', value: stats.ongoing, icon: ClipboardList, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Completed', value: stats.completed, icon: CheckCircle, color: 'text-blue-600', bg: 'bg-blue-50' },
-  ];
-
   return (
     <div className="page-container">
       {/* Header */}
@@ -69,27 +66,132 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stats — horizontal scroll on mobile, grid on desktop */}
-      <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-4 scroll-snap-x">
-        {statCards.map((card, i) => {
-          const Icon = card.icon;
-          return (
-            <motion.div
-              key={card.label}
-              {...fadeUp}
-              transition={{ ...fadeUp.transition, delay: i * 0.05 }}
-              className="flex-shrink-0 w-[148px] md:w-auto bg-white rounded-[10px] border border-gray-200 p-4 md:p-5"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className={`w-9 h-9 rounded-[8px] ${card.bg} flex items-center justify-center`}>
-                  <Icon className={`w-[18px] h-[18px] ${card.color}`} />
-                </div>
-              </div>
-              <p className="text-2xl md:text-[28px] font-bold text-gray-900 tracking-tight leading-none">{card.value}</p>
-              <p className="text-[11px] md:text-xs font-medium text-gray-400 mt-1.5">{card.label}</p>
-            </motion.div>
-          );
-        })}
+      {/* ── UntitledUI-style Metric Cards ── */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        {/* Card 1 — Today's Cases (mini bar chart) */}
+        <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0 }}
+          className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-medium text-gray-500">Today's Cases</p>
+            <Calendar className="w-5 h-5 text-teal-900 shrink-0" />
+          </div>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.total}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
+              <ArrowUpRight className="w-3 h-3" /> 8%
+            </span>
+            <span className="text-[10px] text-gray-400">vs yesterday</span>
+          </div>
+          <div className="mt-3 -mx-1 -mb-1">
+            <ResponsiveContainer width="100%" height={48}>
+              <BarChart data={[
+                { d: 'M', v: 5 }, { d: 'T', v: 7 }, { d: 'W', v: 4 }, { d: 'T', v: 6 },
+                { d: 'F', v: 8 }, { d: 'S', v: 3 }, { d: 'S', v: stats.total },
+              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <Bar dataKey="v" fill="#6366f1" radius={[3, 3, 0, 0]} opacity={0.85} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Card 2 — Pending (area sparkline, amber) */}
+        <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.05 }}
+          className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-medium text-gray-500">Pending</p>
+            <Clock className="w-5 h-5 text-teal-900 shrink-0" />
+          </div>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.pending}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700">
+              <ArrowUpRight className="w-3 h-3" /> 2
+            </span>
+            <span className="text-[10px] text-gray-400">new today</span>
+          </div>
+          <div className="mt-3 -mx-1 -mb-1">
+            <ResponsiveContainer width="100%" height={48}>
+              <AreaChart data={[
+                { d: 1, v: 3 }, { d: 2, v: 5 }, { d: 3, v: 2 }, { d: 4, v: 4 },
+                { d: 5, v: 3 }, { d: 6, v: 1 }, { d: 7, v: stats.pending },
+              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="pendingFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="v" stroke="#f59e0b" strokeWidth={2}
+                  fill="url(#pendingFill)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Card 3 — Ongoing (line chart, emerald) */}
+        <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }}
+          className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-medium text-gray-500">Ongoing</p>
+            <ClipboardList className="w-5 h-5 text-teal-900 shrink-0" />
+          </div>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.ongoing}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
+              <ArrowUpRight className="w-3 h-3" /> 1
+            </span>
+            <span className="text-[10px] text-gray-400">active now</span>
+          </div>
+          <div className="mt-3 -mx-1 -mb-1">
+            <ResponsiveContainer width="100%" height={48}>
+              <AreaChart data={[
+                { d: 1, v: 1 }, { d: 2, v: 2 }, { d: 3, v: 3 }, { d: 4, v: 2 },
+                { d: 5, v: 4 }, { d: 6, v: 3 }, { d: 7, v: stats.ongoing },
+              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="ongoingFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="v" stroke="#10b981" strokeWidth={2}
+                  fill="url(#ongoingFill)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Card 4 — Completed (area sparkline, blue) */}
+        <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.15 }}
+          className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-medium text-gray-500">Completed</p>
+            <CheckCircle className="w-5 h-5 text-teal-900 shrink-0" />
+          </div>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.completed}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700">
+              <ArrowUpRight className="w-3 h-3" /> 15%
+            </span>
+            <span className="text-[10px] text-gray-400">vs last week</span>
+          </div>
+          <div className="mt-3 -mx-1 -mb-1">
+            <ResponsiveContainer width="100%" height={48}>
+              <AreaChart data={[
+                { d: 1, v: 4 }, { d: 2, v: 6 }, { d: 3, v: 5 }, { d: 4, v: 7 },
+                { d: 5, v: 8 }, { d: 6, v: 6 }, { d: 7, v: stats.completed || 1 },
+              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="completedFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="v" stroke="#3b82f6" strokeWidth={2}
+                  fill="url(#completedFill)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
       </div>
 
       {/* Pending Approvals (Admin) */}
@@ -142,27 +244,27 @@ export default function DashboardPage() {
               <h2 className="text-[15px] font-semibold text-gray-900">All Bookings</h2>
               <span className="text-xs text-gray-400">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <div className="space-y-2 md:space-y-0 md:flex md:items-center md:gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search..."
-                  className="input-base !pl-9"
+                  className="w-full py-2.5 md:py-2 input-base"
+                  style={{ paddingLeft: '2.25rem' }}
                 />
               </div>
-              <select
+              <CustomSelect
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="input-base !w-auto flex-shrink-0"
-              >
-                <option value="all">All</option>
-                {BOOKING_STATUSES.map((s) => (
-                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                ))}
-              </select>
+                onChange={(val) => setStatusFilter(val)}
+                options={[
+                  { value: 'all', label: 'All' },
+                  ...BOOKING_STATUSES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })),
+                ]}
+                className="shrink-0 min-w-[120px]"
+              />
             </div>
           </div>
 

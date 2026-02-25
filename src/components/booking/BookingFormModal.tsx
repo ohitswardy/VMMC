@@ -3,7 +3,10 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { Input, Select, Textarea, CheckboxGroup } from '../ui/FormFields';
+import { Input, Textarea, CheckboxGroup } from '../ui/FormFields';
+import { CustomSelect } from '../ui/CustomSelect';
+import { DatePicker } from '../ui/DatePicker';
+import { TimePicker } from '../ui/TimePicker';
 import { useBookingsStore } from '../../stores/appStore';
 import { useAuthStore } from '../../stores/authStore';
 import {
@@ -182,20 +185,19 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
 
         {/* Row: Room & Date */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Select
+          <CustomSelect
             label="OR Room"
             value={form.or_room_id}
-            onChange={(e) => updateField('or_room_id', e.target.value)}
+            onChange={(val) => updateField('or_room_id', val)}
             options={rooms.map((r) => ({ value: r.id, label: `${r.name} — ${r.designation}` }))}
             placeholder="Select room"
             error={errors.or_room_id}
             required
           />
-          <Input
+          <DatePicker
             label="Date"
-            type="date"
             value={form.date}
-            onChange={(e) => updateField('date', e.target.value)}
+            onChange={(val) => updateField('date', val)}
             error={errors.date}
             required
           />
@@ -211,19 +213,17 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
 
         {/* Row: Time */}
         <div className="grid grid-cols-2 gap-4">
-          <Input
+          <TimePicker
             label="Start Time"
-            type="time"
             value={form.start_time}
-            onChange={(e) => updateField('start_time', e.target.value)}
+            onChange={(val) => updateField('start_time', val)}
             error={errors.start_time}
             required
           />
-          <Input
+          <TimePicker
             label="End Time"
-            type="time"
             value={form.end_time}
-            onChange={(e) => updateField('end_time', e.target.value)}
+            onChange={(val) => updateField('end_time', val)}
             error={errors.end_time}
             required
           />
@@ -254,20 +254,20 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
             error={errors.patient_age}
             required
           />
-          <Select
+          <CustomSelect
             label="Sex"
             value={form.patient_sex}
-            onChange={(e) => updateField('patient_sex', e.target.value as 'M' | 'F')}
+            onChange={(val) => updateField('patient_sex', val as 'M' | 'F')}
             options={[{ value: 'M', label: 'Male' }, { value: 'F', label: 'Female' }]}
             required
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select
+          <CustomSelect
             label="Category"
             value={form.patient_category}
-            onChange={(e) => updateField('patient_category', e.target.value)}
+            onChange={(val) => updateField('patient_category', val)}
             options={PATIENT_CATEGORIES.map((c) => ({ value: c, label: c }))}
             placeholder="Select category"
             error={errors.patient_category}
@@ -318,10 +318,10 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
 
         {/* Clearance & Equipment */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select
+          <CustomSelect
             label="Clearance Availability"
             value={form.clearance_availability ? 'yes' : 'no'}
-            onChange={(e) => updateField('clearance_availability', e.target.value === 'yes')}
+            onChange={(val) => updateField('clearance_availability', val === 'yes')}
             options={[{ value: 'yes', label: 'Available' }, { value: 'no', label: 'Not Available' }]}
           />
           <CheckboxGroup

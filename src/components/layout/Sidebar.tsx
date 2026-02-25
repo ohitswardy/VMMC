@@ -38,53 +38,62 @@ export default function Sidebar() {
     <>
       {/* ─── Mobile Bottom Navigation ─── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 safe-bottom">
-        <div className="flex items-stretch">
-          {bottomBarItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.to;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 touch-target"
-              >
-                <div className="relative">
-                  <Icon
-                    className={`w-[22px] h-[22px] transition-colors duration-150 ${
-                      isActive ? 'text-accent-600' : 'text-gray-400'
-                    }`}
-                    strokeWidth={isActive ? 2.2 : 1.5}
-                  />
-                  {item.to === '/notifications' && unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 bg-accent-600 rounded-full text-[9px] text-white flex items-center justify-center font-bold">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </div>
-                <span className={`text-[10px] leading-none font-medium transition-colors duration-150 ${
-                  isActive ? 'text-accent-600' : 'text-gray-400'
-                }`}>
-                  {item.label}
-                </span>
-                {isActive && (
-                  <motion.div
-                    layoutId="bottomNavIndicator"
-                    className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-accent-600 rounded-b-full"
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  />
-                )}
-              </NavLink>
-            );
-          })}
-          {/* Menu toggle */}
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 touch-target"
-          >
-            <Menu className="w-[22px] h-[22px] text-gray-400" strokeWidth={1.5} />
-            <span className="text-[10px] leading-none font-medium text-gray-400">More</span>
-          </button>
-        </div>
+        {/* Total columns = nav items + 1 hamburger */}
+        {(() => {
+          const totalCols = bottomBarItems.length + 1;
+          const activeIdx = bottomBarItems.findIndex((item) => location.pathname === item.to);
+          return (
+            <div className="relative">
+              {/* Sliding indicator */}
+              {activeIdx >= 0 && (
+                <motion.div
+                  className="absolute top-0 h-[3px] rounded-b-full bg-accent-600"
+                  initial={false}
+                  animate={{
+                    left: `calc(${(activeIdx / totalCols) * 100}% + ${100 / totalCols / 2}% - 16px)`,
+                  }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.8 }}
+                  style={{ width: '32px' }}
+                />
+              )}
+
+              <div className="flex items-stretch">
+                {bottomBarItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.to;
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className="flex-1 flex items-center justify-center py-3 touch-target"
+                    >
+                      <div className="relative">
+                        <Icon
+                          className={`w-7 h-7 transition-colors duration-150 ${
+                            isActive ? 'text-accent-600' : 'text-gray-600'
+                          }`}
+                          strokeWidth={isActive ? 2.2 : 1.8}
+                        />
+                        {item.to === '/notifications' && unreadCount > 0 && (
+                          <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 bg-accent-600 rounded-full text-[9px] text-white flex items-center justify-center font-bold">
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                          </span>
+                        )}
+                      </div>
+                    </NavLink>
+                  );
+                })}
+                {/* Menu toggle */}
+                <button
+                  onClick={() => setDrawerOpen(true)}
+                  className="flex-1 flex items-center justify-center py-3 touch-target"
+                >
+                  <Menu className="w-7 h-7 text-gray-600" strokeWidth={1.8} />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </nav>
 
       {/* ─── Mobile Drawer Overlay ─── */}

@@ -6,7 +6,8 @@ import { DEPARTMENTS, USER_ROLES, type DepartmentId } from '../lib/constants';
 import { getDeptName, getDeptColor } from '../lib/utils';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import { Input, Select } from '../components/ui/FormFields';
+import { Input } from '../components/ui/FormFields';
+import { CustomSelect } from '../components/ui/CustomSelect';
 
 export default function UsersPage() {
   const [users] = useState(MOCK_USERS);
@@ -31,10 +32,6 @@ export default function UsersPage() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Users</h1>
           <p className="text-xs md:text-sm text-gray-500 mt-0.5">Manage system users and roles</p>
         </div>
-        <Button size="sm" icon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
-          <span className="hidden sm:inline">Add User</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
       </div>
 
       {/* Users */}
@@ -142,19 +139,28 @@ export default function UsersPage() {
         </div>
       </div>
 
+      {/* Add Button */}
+      <Button className="w-full" icon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
+        Add User
+      </Button>
+
       {/* Add User Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add User" size="md">
         <div className="space-y-4">
           <Input label="Full Name" placeholder="Dr. Juan Dela Cruz" required />
           <Input label="Email" type="email" placeholder="user@vmmc.ph" required />
-          <Select
+          <CustomSelect
             label="Role"
+            value=""
+            onChange={() => {}}
             options={USER_ROLES.map((r) => ({ value: r, label: r.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }))}
             placeholder="Select role"
             required
           />
-          <Select
+          <CustomSelect
             label="Department"
+            value=""
+            onChange={() => {}}
             options={DEPARTMENTS.map((d) => ({ value: d.id, label: d.name }))}
             placeholder="Select department (optional)"
           />
