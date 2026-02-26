@@ -19,8 +19,11 @@ import {
   useBookingsStore,
   useORRoomsStore,
   useORPriorityScheduleStore,
+  useAuditLogsStore,
 } from './stores/appStore';
 import { useEffect } from 'react';
+import { supabase } from './lib/supabase';
+import type { Notification } from './lib/types';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
   const { isAuthenticated, user } = useAuthStore();
@@ -31,10 +34,11 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 
 export default function App() {
   const { isAuthenticated, user, initAuth, isLoading: authLoading } = useAuthStore();
-  const { loadNotifications } = useNotificationsStore();
+  const { loadNotifications, addNotification } = useNotificationsStore();
   const { loadBookings } = useBookingsStore();
   const { loadRooms, loadLiveStatuses } = useORRoomsStore();
   const { loadSchedule } = useORPriorityScheduleStore();
+  const { loadLogs } = useAuditLogsStore();
 
   // Initialize Supabase auth session on first load
   useEffect(() => {
@@ -49,8 +53,39 @@ export default function App() {
       loadLiveStatuses();
       loadSchedule();
       loadNotifications(user.id);
+      // Load audit logs for admin roles
+      if (user.role === 'super_admin' || user.role === 'anesthesiology_admin') {
+        loadLogs();
+      }
     }
-  }, [isAuthenticated, user, authLoading, loadBookings, loadRooms, loadLiveStatuses, loadSchedule, loadNotifications]);
+  }, [isAuthenticated, user, authLoading, loadBookings, loadRooms, loadLiveStatuses, loadSchedule, loadNotifications, loadLogs]);
+
+  // ── Real-time subscription for notifications ──
+  // Listens for new notifications inserted for the current user and adds them to the store
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newNotification = payload.new as Notification;
+          addNotification(newNotification);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, user, addNotification]);
 
   return (
     <BrowserRouter>

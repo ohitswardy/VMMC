@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { parseISO, startOfDay, addDays } from 'date-fns';
+import { parseISO, startOfDay } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Clock, User, Stethoscope, Building2, FileText, AlertTriangle, Edit, Save, X, CheckCircle, XCircle, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -14,6 +14,16 @@ import { useAuthStore } from '../../stores/authStore';
 import { useBookingsStore } from '../../stores/appStore';
 import { ANES_DEPARTMENT_CONTACT } from '../../lib/constants';
 import { getDeptColor, getDeptName, formatTime, canModifyBooking } from '../../lib/utils';
+import {
+  notifyBookingApproved,
+  notifyBookingDenied,
+  notifyBookingEdited,
+} from '../../lib/notificationHelper';
+import {
+  auditBookingApprove,
+  auditBookingDeny,
+  auditBookingEdit,
+} from '../../lib/auditHelper';
 import type { Booking, ORRoom } from '../../lib/types';
 
 interface Props {
@@ -33,11 +43,11 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
   // Anes admin: no restrictions on pending & future bookings
   const canAdminChange = isAdmin && !['completed', 'cancelled', 'denied'].includes(booking.status);
 
-  // Noon block: non-admin can't change approved next-day bookings after 12 PM
+  // Noon block: non-admin can't change same-day bookings after 12 PM
   const _now = new Date();
-  const _tomorrowStart = addDays(startOfDay(_now), 1);
+  const _todayStart = startOfDay(_now);
   const noonBlocked = !isAdmin &&
-    startOfDay(parseISO(booking.date)).getTime() === _tomorrowStart.getTime() &&
+    startOfDay(parseISO(booking.date)).getTime() === _todayStart.getTime() &&
     _now.getHours() >= 12 && booking.status === 'approved';
 
   const canDeptChange = !isAdmin && user?.department_id === booking.department_id &&
@@ -84,6 +94,9 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
     setActionLoading('approve');
     await updateBooking(booking.id, { status: 'approved', approved_by: user?.id, updated_at: new Date().toISOString() });
     toast.success('Booking approved.');
+    // Notify the booking creator and department users
+    notifyBookingApproved(booking, user?.full_name || 'Admin');
+    if (user) auditBookingApprove(user.id, booking);
     setActionLoading(null);
     onClose();
   };
@@ -93,6 +106,9 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
     setActionLoading('deny');
     await updateBooking(booking.id, { status: 'denied', denial_reason: denyReason.trim(), updated_at: new Date().toISOString() });
     toast.success('Booking denied.');
+    // Notify the booking creator and department users
+    notifyBookingDenied(booking, user?.full_name || 'Admin', denyReason.trim());
+    if (user) auditBookingDeny(user.id, booking, denyReason.trim());
     setActionLoading(null);
     onClose();
   };
@@ -105,6 +121,9 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
     setEditSaving(true);
     await updateBooking(booking.id, { ...editForm, updated_at: new Date().toISOString() });
     toast.success('Booking updated.');
+    // Notify the booking creator and department users about the edit
+    notifyBookingEdited(booking, user?.full_name || 'Admin');
+    if (user) auditBookingEdit(user.id, booking.id, editForm as Record<string, unknown>);
     setEditSaving(false);
     setIsEditing(false);
   };
@@ -168,7 +187,7 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
                   label="OR Room"
                   value={editForm.or_room_id}
                   onChange={(v) => setEditForm((p) => ({ ...p, or_room_id: v }))}
-                  options={rooms.map((r) => ({ value: r.id, label: `${r.name} — ${r.designation}` }))}
+                  options={rooms.map((r) => ({ value: r.id, label: r.name }))}
                 />
               )}
             </div>
@@ -265,7 +284,7 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
               <p className="text-sm font-semibold text-amber-700">Changes no longer available</p>
             </div>
             <p className="text-xs text-amber-600">
-              The 12:00 PM cutoff for next-day booking changes has passed. Please contact the Department of Anesthesiology for any modifications.
+              The 12:00 PM cutoff for same-day booking changes has passed. Please contact the Department of Anesthesiology for any modifications.
             </p>
             <div className="p-3 rounded-[8px] bg-white border border-amber-100">
               <p className="text-sm font-semibold text-gray-800">📞 Contact {ANES_DEPARTMENT_CONTACT.name}</p>

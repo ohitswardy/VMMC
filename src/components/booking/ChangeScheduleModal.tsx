@@ -10,6 +10,8 @@ import { useAuthStore } from '../../stores/authStore';
 import { useChangeRequestsStore } from '../../stores/appStore';
 import { DEPARTMENTS, CHANGE_REASONS, IM_SUBSPECIALTIES, ANES_DEPARTMENT_CONTACT } from '../../lib/constants';
 import { canModifyBooking } from '../../lib/utils';
+import { notifyChangeRequestSubmitted } from '../../lib/notificationHelper';
+import { auditChangeRequestSubmit } from '../../lib/auditHelper';
 import type { Booking } from '../../lib/types';
 
 interface Props {
@@ -63,7 +65,23 @@ export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props)
         notes: form.additional_info || undefined,
         status: 'pending',
       } as any);
+
+      // Notify admins about the change request
+      const reason = form.reason === 'Others' ? (form.reason_other || form.reason) : form.reason;
+      notifyChangeRequestSubmitted(
+        booking,
+        user?.full_name || 'Unknown',
+        reason,
+        form.new_date,
+        form.new_preferred_time
+      );
+
       toast.success('Change request submitted successfully!');
+      if (user) auditChangeRequestSubmit(user.id, booking.id, {
+        new_date: form.new_date,
+        new_start_time: form.new_preferred_time,
+        reason,
+      });
       onClose();
     } catch (err) {
       console.error(err);

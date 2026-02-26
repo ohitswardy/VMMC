@@ -5,6 +5,8 @@ import { format } from 'date-fns';
 import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { getDeptColor, getDeptName, formatTime, getRoomStatusInfo } from '../lib/utils';
 import { useAuthStore } from '../stores/authStore';
+import { notifyRoomStatusChange } from '../lib/notificationHelper';
+import { auditRoomStatusChange } from '../lib/auditHelper';
 import type { ORRoomStatus } from '../lib/constants';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
@@ -44,6 +46,9 @@ export default function LiveBoardPage() {
   const confirmStatusChange = () => {
     if (!pending) return;
     setLiveStatus(pending.roomId, pending.to);
+    // Send notifications for significant status changes
+    notifyRoomStatusChange(pending.roomName, pending.to, user?.full_name || 'Admin');
+    if (user) auditRoomStatusChange(user.id, pending.roomId, pending.roomName, pending.from, pending.to);
     setPending(null);
   };
 

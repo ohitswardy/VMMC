@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format, parseISO, startOfDay, addDays, isAfter } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -15,6 +15,17 @@ import {
   type DepartmentId
 } from '../../lib/constants';
 import { hasRoomConflict, hasAnesthesiologistConflict, timeRangesOverlap, formatTime } from '../../lib/utils';
+import {
+  auditBookingCreate,
+  auditBookingUpdate,
+  auditEmergencyInsert,
+} from '../../lib/auditHelper';
+import {
+  notifyNewBookingRequest,
+  notifyBookingConfirmation,
+  notifyEmergencyInsertion,
+  notifyBumpedCases,
+} from '../../lib/notificationHelper';
 import type { Booking, ORRoom } from '../../lib/types';
 
 interface Props {
@@ -90,6 +101,45 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBumpConfirm, setShowBumpConfirm] = useState(false);
 
+  // Reset form whenever the modal opens so room & date match the calendar selection
+  useEffect(() => {
+    if (!isOpen) return;
+    if (editingBooking) {
+      setForm({
+        or_room_id: editingBooking.or_room_id || '',
+        date: editingBooking.date || format(selectedDate, 'yyyy-MM-dd'),
+        start_time: editingBooking.start_time || '08:00',
+        end_time: editingBooking.end_time || '10:00',
+        patient_name: editingBooking.patient_name || '',
+        patient_age: String(editingBooking.patient_age || ''),
+        patient_sex: (editingBooking.patient_sex || 'M') as 'M' | 'F',
+        patient_category: (editingBooking.patient_category || '') as string,
+        ward: editingBooking.ward || '',
+        procedure: editingBooking.procedure || '',
+        surgeon: editingBooking.surgeon || '',
+        anesthesiologist: editingBooking.anesthesiologist || '',
+        scrub_nurse: editingBooking.scrub_nurse || '',
+        circulating_nurse: editingBooking.circulating_nurse || '',
+        clearance_availability: editingBooking.clearance_availability ?? true,
+        special_equipment: Array.isArray(editingBooking.special_equipment)
+          ? editingBooking.special_equipment.join(', ')
+          : (editingBooking.special_equipment || '') as string,
+        estimated_duration_minutes: String(editingBooking.estimated_duration_minutes || '120'),
+        notes: editingBooking.notes || '',
+        is_emergency: editingBooking.is_emergency || false,
+        emergency_reason: editingBooking.emergency_reason || '',
+      });
+    } else {
+      setForm({
+        ...defaultForm,
+        or_room_id: selectedRoom || '',
+        date: format(selectedDate, 'yyyy-MM-dd'),
+      });
+    }
+    setErrors({});
+    setShowBumpConfirm(false);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
   const userDept = user?.department_id;
 
@@ -114,7 +164,6 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
     const selected = parseISO(form.date);
     const now = new Date();
     const today = startOfDay(now);
-    const tomorrow = addDays(today, 1);
     const maxDate = addDays(today, 14);
     const selectedDay = startOfDay(selected);
     const dayOfWeek = selected.getDay();
@@ -122,8 +171,8 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       return { type: 'weekend' as const, title: 'Weekend Booking Not Available', message: 'Elective cases are only available Monday through Friday. Please select a weekday or contact the Department of Anesthesiology for assistance.' };
     }
-    if (selectedDay.getTime() === tomorrow.getTime() && now.getHours() >= 12) {
-      return { type: 'noon' as const, title: 'Booking Deadline Exceeded (12:00 PM)', message: 'Elective bookings for the following day must be submitted before 12:00 PM. Please contact the Department of Anesthesiology for urgent scheduling.' };
+    if (selectedDay.getTime() === today.getTime() && now.getHours() >= 12) {
+      return { type: 'noon' as const, title: 'Same-Day Booking Restricted (Past 12:00 PM)', message: 'Elective bookings for today cannot be submitted after 12:00 PM. Please contact the Department of Anesthesiology for urgent scheduling.' };
     }
     if (isAfter(selectedDay, maxDate)) {
       return { type: 'max_date' as const, title: 'Maximum Booking Range Exceeded', message: 'Elective bookings can only be made up to 2 weeks (14 days) in advance. Please select an earlier date.' };
@@ -249,12 +298,29 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
     if (isEditing && editingBooking) {
       await updateBooking(editingBooking.id, newBooking);
       toast.success('Booking updated successfully!');
+      if (user) auditBookingUpdate(user.id, editingBooking.id, { status: editingBooking.status }, newBooking as Record<string, unknown>);
     } else {
-      await addBooking(newBooking as Booking);
-      if (form.is_emergency && bumpedCases.length > 0) {
-        toast.success(`Emergency case inserted! ${bumpedCases.length} to-follow case(s) bumped off.`);
+      const created = await addBooking(newBooking as Booking);
+
+      // ── Send notifications ──
+      if (form.is_emergency) {
+        // Notify all users about emergency insertion
+        notifyEmergencyInsertion(created, user?.full_name || 'Admin');
+        if (user) auditEmergencyInsert(user.id, created, bumpedCases.map(b => b.id));
+        if (bumpedCases.length > 0) {
+          // Notify bumped case creators
+          notifyBumpedCases(bumpedCases, form.patient_name, form.procedure);
+          toast.success(`Emergency case inserted! ${bumpedCases.length} to-follow case(s) bumped off.`);
+        } else {
+          toast.success('Emergency case inserted!');
+        }
       } else {
-        toast.success(form.is_emergency ? 'Emergency case inserted!' : 'Booking request submitted successfully!');
+        // Notify admins about the new request
+        notifyNewBookingRequest(created);
+        // Confirm to the creator
+        notifyBookingConfirmation(created);
+        if (user) auditBookingCreate(user.id, created);
+        toast.success('Booking request submitted successfully!');
       }
     }
     setIsSubmitting(false);
@@ -369,7 +435,7 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
             label="OR Room"
             value={form.or_room_id}
             onChange={(val) => updateField('or_room_id', val)}
-            options={rooms.map((r) => ({ value: r.id, label: `${r.name} — ${r.designation}` }))}
+            options={rooms.map((r) => ({ value: r.id, label: r.name }))}
             placeholder="Select room"
             error={errors.or_room_id}
             required

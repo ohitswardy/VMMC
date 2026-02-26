@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useCallback } from 'react';
+﻿import { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Plus, AlertTriangle,
@@ -9,9 +9,10 @@ import {
   isToday, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths,
   subMonths, isSameMonth, isSameDay
 } from 'date-fns';
-import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
+import { useBookingsStore, useORRoomsStore, useORPriorityScheduleStore } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
-import { getDeptColor, getDeptBg, getDeptName, formatTime, generateTimeSlots } from '../lib/utils';
+import { getDeptColor, getDeptBg, getDeptName, formatTime, generateTimeSlots, getRoomPriorityForDay, getAllPrioritiesForDay, getWeekdayName } from '../lib/utils';
+import type { RoomPriorityInfo } from '../lib/utils';
 import type { Booking, ORRoom } from '../lib/types';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
@@ -33,8 +34,14 @@ export default function ORCalendarPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [mobileRoomIdx, setMobileRoomIdx] = useState(0);
 
+  // Always show today's date when the calendar page is first visited
+  useEffect(() => {
+    setSelectedDate(new Date());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { rooms } = useORRoomsStore();
   const { bookings } = useBookingsStore();
+  const { schedule } = useORPriorityScheduleStore();
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
   const isDeptUser = user?.role === 'department_user';
@@ -189,14 +196,20 @@ export default function ORCalendarPage() {
         </div>
         {viewMode === 'day' && (
           <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-            {rooms.map((room, idx) => (
-              <button key={room.id} onClick={() => setMobileRoomIdx(idx)}
-                className={`shrink-0 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all ${
-                  mobileRoomIdx === idx ? 'bg-accent-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 active:bg-gray-200'
-                }`}>
-                {room.name}
-              </button>
-            ))}
+            {rooms.map((room, idx) => {
+              const hasPriority = getRoomPriorityForDay(room, schedule, getWeekdayName(selectedDate)).length > 0;
+              return (
+                <button key={room.id} onClick={() => setMobileRoomIdx(idx)}
+                  className={`shrink-0 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all relative ${
+                    mobileRoomIdx === idx ? 'bg-accent-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+                  }`}>
+                  {room.name}
+                  {hasPriority && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 border border-white" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -226,7 +239,7 @@ export default function ORCalendarPage() {
             <DayView rooms={rooms} date={selectedDate} timeSlots={timeSlots}
               getBookingsForRoomDate={getBookingsForRoomDate} onBookingClick={handleBookingClick}
               onSlotClick={(rid, d) => handleSlotClick(rid, d)} canBook={canBook}
-              mobileRoomIdx={mobileRoomIdx} />
+              mobileRoomIdx={mobileRoomIdx} schedule={schedule} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -612,7 +625,7 @@ function WeekView({
    ═══════════════════════════════════════════════════════════════════ */
 function DayView({
   rooms, date, timeSlots, getBookingsForRoomDate,
-  onBookingClick, onSlotClick, canBook, mobileRoomIdx,
+  onBookingClick, onSlotClick, canBook, mobileRoomIdx, schedule,
 }: {
   rooms: ORRoom[];
   date: Date;
@@ -622,9 +635,12 @@ function DayView({
   onSlotClick: (roomId: string, d: Date) => void;
   canBook: boolean;
   mobileRoomIdx: number;
+  schedule: Record<string, string>;
 }) {
   const mobileRoom = rooms[mobileRoomIdx];
   const mobileBookings = mobileRoom ? getBookingsForRoomDate(mobileRoom.id, date) : [];
+  const weekday = getWeekdayName(date);
+  const dayPriorities = getAllPrioritiesForDay(schedule, weekday);
 
   const getBookingStyle = (booking: Booking) => {
     const [sh, sm] = booking.start_time.split(':').map(Number);
@@ -638,16 +654,44 @@ function DayView({
 
   return (
     <>
+      {/* Day Priority Summary */}
+      {dayPriorities.length > 0 && (
+        <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+          <p className="text-[11px] font-semibold text-amber-700 mb-1">📋 OR Priority Schedule — {weekday}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {dayPriorities.map(p => (
+              <span key={p.deptId} className="inline-flex items-center gap-1 text-[10px] font-medium rounded-full px-2 py-0.5"
+                style={{ backgroundColor: p.bg, color: p.color }}>
+                {p.deptName}: {p.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Mobile: single-room timeline */}
       <div className="md:hidden bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {mobileRoom && (
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
-            <p className="text-sm font-bold text-gray-900">{mobileRoom.name}</p>
-            <p className="text-[11px] text-gray-400 mt-0.5">
-              {mobileRoom.designation} · {mobileBookings.length} case{mobileBookings.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-        )}
+        {mobileRoom && (() => {
+          const roomPriorities = getRoomPriorityForDay(mobileRoom, schedule, weekday);
+          return (
+            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+              <p className="text-sm font-bold text-gray-900">{mobileRoom.name}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                {mobileRoom.designation} · {mobileBookings.length} case{mobileBookings.length !== 1 ? 's' : ''}
+              </p>
+              {roomPriorities.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {roomPriorities.map(p => (
+                    <span key={p.deptId} className="inline-flex items-center gap-0.5 text-[10px] font-semibold rounded-full px-2 py-0.5"
+                      style={{ backgroundColor: p.bg, color: p.color }}>
+                      ★ {p.deptName} {p.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="relative">
           {timeSlots.map(slot => (
@@ -711,12 +755,25 @@ function DayView({
           <div className="px-3 py-3 text-[11px] font-medium text-gray-400 border-r border-gray-100 flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" /> Time
           </div>
-          {rooms.map(room => (
-            <div key={room.id} className="px-2 py-3 text-center border-r border-gray-100 last:border-r-0">
-              <p className="text-xs font-bold text-gray-900">{room.name}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">{room.designation}</p>
-            </div>
-          ))}
+          {rooms.map(room => {
+            const roomPriorities = getRoomPriorityForDay(room, schedule, weekday);
+            return (
+              <div key={room.id} className="px-2 py-3 text-center border-r border-gray-100 last:border-r-0">
+                <p className="text-xs font-bold text-gray-900">{room.name}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{room.designation}</p>
+                {roomPriorities.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-0.5 mt-1">
+                    {roomPriorities.map(p => (
+                      <span key={p.deptId} className="inline-flex items-center text-[9px] font-semibold rounded-full px-1.5 py-0.5"
+                        style={{ backgroundColor: p.bg, color: p.color }}>
+                        ★ {p.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div

@@ -239,7 +239,7 @@ export async function insertNotification(notification: Omit<Notification, 'id' |
 export async function fetchAuditLogs(): Promise<AuditLog[]> {
   const { data, error } = await supabase
     .from('audit_logs')
-    .select('*')
+    .select('*, user_profile:profiles!audit_logs_user_id_fkey(id, full_name, email, role, department_id)')
     .order('created_at', { ascending: false })
     .limit(500);
   if (error) throw error;

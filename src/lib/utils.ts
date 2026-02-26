@@ -1,6 +1,6 @@
 import { format, parseISO, differenceInMinutes, addMinutes, isWithinInterval, isBefore, addHours } from 'date-fns';
-import type { Booking } from './types';
-import { DEPARTMENT_MAP, type DepartmentId } from './constants';
+import type { Booking, ORRoom } from './types';
+import { DEPARTMENT_MAP, DEPARTMENTS, type DepartmentId } from './constants';
 
 /** Format a date string to human readable */
 export function formatDate(date: string | Date, fmt = 'MMM dd, yyyy'): string {
@@ -138,4 +138,104 @@ export function getRoomStatusInfo(status: string): { label: string; color: strin
     case 'deferred': return { label: 'Deferred', color: 'text-red-500', bgColor: 'bg-red-100' };
     default: return { label: 'Idle', color: 'text-blue-500', bgColor: 'bg-blue-50' };
   }
+}
+
+// ── OR Priority Schedule Helpers ──
+
+/** Map room designation to primary department IDs */
+const DESIGNATION_DEPT_MAP: Record<string, DepartmentId[]> = {
+  'General Surgery': ['GS'],
+  'OB-GYNE': ['OBGYNE'],
+  'Orthopedics': ['ORTHO'],
+  'ENT': ['ENT'],
+  'Ophtha': ['OPHTHA'],
+  'Cardiac': ['CARDIAC', 'TCVS'],
+  'Neurosurgery': ['NEURO'],
+  'Pediatrics': ['PEDIA'],
+  'Urology': ['URO'],
+  'Plastics': ['PLASTICS'],
+};
+
+/** Get the department IDs that match a room's designation */
+export function getRoomDesignationDepts(designation: string): DepartmentId[] {
+  const depts: DepartmentId[] = [];
+  for (const [keyword, deptIds] of Object.entries(DESIGNATION_DEPT_MAP)) {
+    if (designation.toLowerCase().includes(keyword.toLowerCase())) {
+      depts.push(...deptIds);
+    }
+  }
+  return depts;
+}
+
+export interface RoomPriorityInfo {
+  deptId: DepartmentId;
+  deptName: string;
+  label: string;
+  color: string;
+  bg: string;
+}
+
+/**
+ * Get the priority departments for a specific room on a given weekday.
+ * Returns all matching department priorities for the room based on its designation.
+ */
+export function getRoomPriorityForDay(
+  room: ORRoom,
+  schedule: Record<string, string>,
+  weekday: string
+): RoomPriorityInfo[] {
+  const roomDepts = getRoomDesignationDepts(room.designation);
+  const priorities: RoomPriorityInfo[] = [];
+
+  for (const deptId of roomDepts) {
+    const key = `${deptId}-${weekday}`;
+    const label = schedule[key];
+    if (label) {
+      const dept = DEPARTMENT_MAP[deptId];
+      priorities.push({
+        deptId,
+        deptName: dept?.name || deptId,
+        label,
+        color: dept?.color || '#6b7280',
+        bg: dept?.bg || '#f3f4f6',
+      });
+    }
+  }
+
+  return priorities;
+}
+
+/**
+ * Get ALL department priorities for a given weekday.
+ * Returns an array of { deptId, deptName, label, color, bg }.
+ */
+export function getAllPrioritiesForDay(
+  schedule: Record<string, string>,
+  weekday: string
+): RoomPriorityInfo[] {
+  const priorities: RoomPriorityInfo[] = [];
+
+  for (const dept of DEPARTMENTS) {
+    const key = `${dept.id}-${weekday}`;
+    const label = schedule[key];
+    if (label) {
+      priorities.push({
+        deptId: dept.id as DepartmentId,
+        deptName: dept.name,
+        label,
+        color: dept.color,
+        bg: dept.bg,
+      });
+    }
+  }
+
+  return priorities;
+}
+
+/**
+ * Get the weekday name (Monday-Friday) for a Date.
+ * Returns empty string for weekends.
+ */
+export function getWeekdayName(date: Date): string {
+  return format(date, 'EEEE');
 }

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UserProfile } from '../lib/types';
 import { signIn, signOut, getSession, fetchProfile } from '../lib/supabaseService';
+import { auditLogin, auditLogout } from '../lib/auditHelper';
 import { supabase } from '../lib/supabase';
 
 interface AuthState {
@@ -36,6 +37,7 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Account not found. Please contact an administrator.');
           }
           set({ user: profile, isAuthenticated: true, isLoading: false });
+          auditLogin(profile.id);
         } catch (err) {
           set({ user: null, isAuthenticated: false, isLoading: false });
           throw err; // re-throw so LoginPage can show the toast
@@ -43,6 +45,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
+        const state = useAuthStore.getState();
+        if (state.user) auditLogout(state.user.id);
         await signOut();
         set({ user: null, isAuthenticated: false, isLoading: false });
       },
