@@ -9,15 +9,15 @@ import {
   PieChart as RePieChart, Pie, Cell, Legend,
   AreaChart, Area, LineChart, Line
 } from 'recharts';
-import { MOCK_BOOKINGS, MOCK_OR_ROOMS } from '../lib/mockData';
+import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { getDeptColor, getDeptName, calcUtilization } from '../lib/utils';
 import type { DepartmentId } from '../lib/constants';
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444', '#84cc16'];
 
 export default function ReportsPage() {
-  const bookings = MOCK_BOOKINGS;
-  const rooms = MOCK_OR_ROOMS;
+  const { bookings } = useBookingsStore();
+  const { rooms } = useORRoomsStore();
 
   // OR Utilization per room
   const utilizationData = useMemo(() => {

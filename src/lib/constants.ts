@@ -57,7 +57,7 @@ export const BOOKING_STATUSES = [
 export type BookingStatus = typeof BOOKING_STATUSES[number];
 
 // ── OR Room live status ──
-export const OR_ROOM_STATUSES = ['idle', 'ongoing', 'ended'] as const;
+export const OR_ROOM_STATUSES = ['idle', 'in_transit', 'ongoing', 'ended', 'deferred'] as const;
 export type ORRoomStatus = typeof OR_ROOM_STATUSES[number];
 
 // ── Change reasons ──
@@ -77,6 +77,7 @@ export const USER_ROLES = [
   'super_admin',
   'anesthesiology_admin',
   'department_user',
+  'nurse',
   'viewer',
 ] as const;
 
@@ -88,3 +89,53 @@ export const DEFAULT_BUFFER_TIME = 30;
 // ── Retention policy ──
 export const RETENTION_DAYS_DOWNLOAD = 7;
 export const RETENTION_DAYS_ARCHIVE = 30;
+
+// ── Anesthesiology Department Contact ──
+export const ANES_DEPARTMENT_CONTACT = {
+  name: 'Department of Anesthesiology',
+  phone: '(02) 8981-8150 loc. 286',
+  email: 'vmmc.anesthesiology@gmail.com',
+};
+
+// ── Weekdays ──
+export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
+export type Weekday = typeof WEEKDAYS[number];
+
+// ── Default OR Priority Schedule (department per room per day) ──
+// Each key is `${departmentId}-${Weekday}` → value string (e.g., "PRIORITY", "Dr. Cruz, Dr. Ong")
+// Based on the VMMC proposed schedule.
+export const DEFAULT_OR_PRIORITY_SCHEDULE: Record<string, string> = {
+  // GS row — specific anesthesiologists named per day
+  'GS-Monday': 'Dr. Littaua, Dr. Taplac',
+  'GS-Tuesday': 'Dr. Ocampo',
+  'GS-Wednesday': 'Dr. Cruz, Dr. Ong',
+  'GS-Thursday': 'Dr. Bartolome, Dr. Andres, Dr. RM Santos',
+  'GS-Friday': 'Dr. Yabut, Dr. Guerrero',
+  // Urology
+  'URO-Monday': 'PRIORITY',
+  'URO-Wednesday': 'PRIORITY OPEN',
+  'URO-Friday': 'PRIORITY NON-OPEN (ENDOSCOPY)',
+  // Ortho
+  'ORTHO-Monday': 'PRIORITY',
+  'ORTHO-Tuesday': 'PRIORITY',
+  'ORTHO-Friday': 'PRIORITY',
+  // TCVS
+  'TCVS-Wednesday': 'PRIORITY',
+  // Neurosurgery
+  'NEURO-Wednesday': 'PRIORITY',
+  'NEURO-Friday': 'PRIORITY',
+  // Plastics
+  'PLASTICS-Wednesday': 'PRIORITY',
+  'PLASTICS-Friday': 'PRIORITY',
+  // Pedia Surgery
+  'PEDIA-Monday': 'PRIORITY',
+  // OB-GYE
+  'OBGYNE-Tuesday': 'PRIORITY',
+  'OBGYNE-Thursday': 'PRIORITY',
+  // Ophtha
+  'OPHTHA-Tuesday': 'PRIORITY',
+  'OPHTHA-Thursday': 'PRIORITY',
+  // ENT
+  'ENT-Tuesday': 'PRIORITY',
+  'ENT-Thursday': 'PRIORITY',
+};

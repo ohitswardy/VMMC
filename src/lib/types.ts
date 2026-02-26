@@ -48,6 +48,8 @@ export interface Booking {
   procedure: string;
   surgeon: string;
   anesthesiologist: string;
+  scrub_nurse: string;
+  circulating_nurse: string;
   clearance_availability: boolean;
   special_equipment: string[];
   estimated_duration_minutes: number;

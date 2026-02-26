@@ -14,8 +14,12 @@ import DocumentsPage from './pages/DocumentsPage';
 import AuditLogsPage from './pages/AuditLogsPage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
-import { useNotificationsStore } from './stores/appStore';
-import { MOCK_NOTIFICATIONS } from './lib/mockData';
+import {
+  useNotificationsStore,
+  useBookingsStore,
+  useORRoomsStore,
+  useORPriorityScheduleStore,
+} from './stores/appStore';
 import { useEffect } from 'react';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
@@ -26,15 +30,27 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 }
 
 export default function App() {
-  const { isAuthenticated } = useAuthStore();
-  const { setNotifications } = useNotificationsStore();
+  const { isAuthenticated, user, initAuth, isLoading: authLoading } = useAuthStore();
+  const { loadNotifications } = useNotificationsStore();
+  const { loadBookings } = useBookingsStore();
+  const { loadRooms, loadLiveStatuses } = useORRoomsStore();
+  const { loadSchedule } = useORPriorityScheduleStore();
 
-  // Load mock notifications on mount
+  // Initialize Supabase auth session on first load
   useEffect(() => {
-    if (isAuthenticated) {
-      setNotifications(MOCK_NOTIFICATIONS);
+    initAuth();
+  }, [initAuth]);
+
+  // Bootstrap all app data once auth is confirmed (not while still loading)
+  useEffect(() => {
+    if (isAuthenticated && user && !authLoading) {
+      loadBookings();
+      loadRooms();
+      loadLiveStatuses();
+      loadSchedule();
+      loadNotifications(user.id);
     }
-  }, [isAuthenticated, setNotifications]);
+  }, [isAuthenticated, user, authLoading, loadBookings, loadRooms, loadLiveStatuses, loadSchedule, loadNotifications]);
 
   return (
     <BrowserRouter>
@@ -81,7 +97,7 @@ export default function App() {
           <Route
             path="or-rooms"
             element={
-              <ProtectedRoute roles={['super_admin', 'anesthesiology_admin']}>
+              <ProtectedRoute roles={['super_admin', 'anesthesiology_admin', 'nurse']}>
                 <ORRoomsPage />
               </ProtectedRoute>
             }
@@ -90,7 +106,7 @@ export default function App() {
           <Route
             path="reports"
             element={
-              <ProtectedRoute roles={['super_admin', 'anesthesiology_admin']}>
+              <ProtectedRoute roles={['super_admin']}>
                 <ReportsPage />
               </ProtectedRoute>
             }
@@ -98,7 +114,7 @@ export default function App() {
           <Route
             path="documents"
             element={
-              <ProtectedRoute roles={['super_admin', 'anesthesiology_admin', 'department_user']}>
+              <ProtectedRoute roles={['super_admin', 'anesthesiology_admin']}>
                 <DocumentsPage />
               </ProtectedRoute>
             }

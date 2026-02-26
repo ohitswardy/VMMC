@@ -3,14 +3,25 @@ import { motion } from 'framer-motion';
 import { Shield, Search } from 'lucide-react';
 import { DatePicker } from '../components/ui/DatePicker';
 import { CustomSelect } from '../components/ui/CustomSelect';
-import { MOCK_AUDIT_LOGS, MOCK_USERS } from '../lib/mockData';
+import { useAuditLogsStore } from '../stores/appStore';
 
 export default function AuditLogsPage() {
-  const logs = MOCK_AUDIT_LOGS;
+  const { logs } = useAuditLogsStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [userFilter, setUserFilter] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+
+  // Build user options from joined profile data in logs
+  const userOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const l of logs) {
+      if (!seen.has(l.user_id)) {
+        seen.set(l.user_id, l.user_profile?.full_name || l.user_id);
+      }
+    }
+    return [{ value: '', label: 'All Users' }, ...Array.from(seen.entries()).map(([id, name]) => ({ value: id, label: name }))];
+  }, [logs]);
 
   const filtered = useMemo(() => {
     let result = logs;
@@ -34,9 +45,8 @@ export default function AuditLogsPage() {
     return { bg: 'bg-gray-50', text: 'text-gray-700' };
   };
 
-  const getUserName = (userId: string) => {
-    const user = MOCK_USERS.find((u) => u.id === userId);
-    return user?.full_name || userId;
+  const getUserName = (log: typeof logs[0]) => {
+    return log.user_profile?.full_name || log.user_id;
   };
 
   return (
@@ -75,10 +85,7 @@ export default function AuditLogsPage() {
           <CustomSelect
             value={userFilter}
             onChange={(val) => setUserFilter(val)}
-            options={[
-              { value: '', label: 'All Users' },
-              ...MOCK_USERS.map((u) => ({ value: u.id, label: u.full_name })),
-            ]}
+            options={userOptions}
             className="shrink-0"
           />
           <CustomSelect
@@ -111,11 +118,11 @@ export default function AuditLogsPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-accent-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-                    {getUserName(log.user_id).charAt(0)}
+                    {getUserName(log).charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-800 truncate">{getUserName(log.user_id)}</span>
+                      <span className="text-sm font-medium text-gray-800 truncate">{getUserName(log)}</span>
                       <span className={`px-2 py-0.5 rounded-[6px] text-[10px] font-medium flex-shrink-0 ${badge.bg} ${badge.text}`}>
                         {log.action}
                       </span>
@@ -162,9 +169,9 @@ export default function AuditLogsPage() {
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-accent-600 flex items-center justify-center text-white text-[9px] font-bold">
-                          {getUserName(log.user_id).charAt(0)}
+                          {getUserName(log).charAt(0)}
                         </div>
-                        <span className="text-sm text-gray-700">{getUserName(log.user_id)}</span>
+                        <span className="text-sm text-gray-700">{getUserName(log)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-3">

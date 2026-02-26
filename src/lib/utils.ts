@@ -132,8 +132,10 @@ export function getStatusColor(status: string): { bg: string; text: string; dot:
 /** Get OR Room status display info */
 export function getRoomStatusInfo(status: string): { label: string; color: string; bgColor: string } {
   switch (status) {
+    case 'in_transit': return { label: 'In Transit', color: 'text-amber-600', bgColor: 'bg-amber-100' };
     case 'ongoing': return { label: 'Ongoing', color: 'text-emerald-600', bgColor: 'bg-emerald-100' };
     case 'ended': return { label: 'Ended', color: 'text-gray-500', bgColor: 'bg-gray-100' };
+    case 'deferred': return { label: 'Deferred', color: 'text-red-500', bgColor: 'bg-red-100' };
     default: return { label: 'Idle', color: 'text-blue-500', bgColor: 'bg-blue-50' };
   }
 }

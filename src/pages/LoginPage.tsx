@@ -2,9 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
-import { MOCK_USERS } from '../lib/mockData';
 import Button from '../components/ui/Button';
-import type { UserProfile } from '../lib/types';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -12,31 +10,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { setUser } = useAuthStore();
+  const { login } = useAuthStore();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
-    // Simulate auth delay
-    await new Promise((r) => setTimeout(r, 800));
-
-    // Demo: match by email from mock users
-    const user = MOCK_USERS.find((u: UserProfile) => u.email === email);
-    if (user) {
-      setUser(user);
-      toast.success(`Welcome back, ${user.full_name}!`);
-    } else {
-      toast.error('Invalid credentials. Try one of the demo accounts.');
-    }
-    setIsLoading(false);
-  };
-
-  const quickLogin = (loginEmail: string) => {
-    const user = MOCK_USERS.find((u: UserProfile) => u.email === loginEmail);
-    if (user) {
-      setUser(user);
-      toast.success(`Signed in as ${user.full_name}`);
+    try {
+      await login(email, password);
+      toast.success('Welcome back!');
+    } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : String(err);
+      toast.error(raw || 'Sign in failed.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -118,15 +104,28 @@ export default function LoginPage() {
 
           {/* Quick login for demo */}
           <div className="mt-8">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Quick demo access</p>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Demo accounts</p>
             <div className="grid grid-cols-2 gap-2">
-              {MOCK_USERS.slice(0, 4).map((u: UserProfile) => (
+              {[
+                { email: 'admin@vmmc.gov.ph',      label: 'System Admin',    role: 'super_admin' },
+                { email: 'anes.admin@vmmc.gov.ph',  label: 'Anes Admin',      role: 'anesthesiology_admin' },
+                { email: 'nurse@vmmc.gov.ph',       label: 'OR Nurse',        role: 'nurse' },
+                { email: 'gs@vmmc.gov.ph',          label: 'General Surgery', role: 'department_user' },
+                { email: 'obgyne@vmmc.gov.ph',      label: 'OB-GYNE',         role: 'department_user' },
+                { email: 'ortho@vmmc.gov.ph',       label: 'Orthopedics',     role: 'department_user' },
+                { email: 'ophtha@vmmc.gov.ph',      label: 'Ophthalmology',   role: 'department_user' },
+                { email: 'ent@vmmc.gov.ph',         label: 'ENT',             role: 'department_user' },
+                { email: 'pedia@vmmc.gov.ph',       label: 'Pediatrics',      role: 'department_user' },
+                { email: 'uro@vmmc.gov.ph',         label: 'Urology',         role: 'department_user' },
+                { email: 'tcvs@vmmc.gov.ph',        label: 'TCVS',            role: 'department_user' },
+                { email: 'neuro@vmmc.gov.ph',       label: 'Neurosurgery',    role: 'department_user' },
+              ].map((u) => (
                 <button
-                  key={u.id}
-                  onClick={() => quickLogin(u.email)}
+                  key={u.email}
+                  onClick={() => { setEmail(u.email); setPassword('Vmmc@2026!'); }}
                   className="px-3 py-3 rounded-[10px] bg-white border border-gray-200 hover:border-gray-300 active:bg-gray-50 text-left transition-all duration-150 touch-target group"
                 >
-                  <span className="block text-[13px] font-semibold text-gray-800 truncate group-hover:text-accent-600 transition-colors">{u.full_name}</span>
+                  <span className="block text-[13px] font-semibold text-gray-800 truncate group-hover:text-accent-600 transition-colors">{u.label}</span>
                   <span className="text-[11px] text-gray-400 capitalize">{u.role.replace(/_/g, ' ')}</span>
                 </button>
               ))}

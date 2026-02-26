@@ -8,8 +8,9 @@ import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line
 } from 'recharts';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
-import { MOCK_BOOKINGS, MOCK_OR_ROOMS } from '../lib/mockData';
+import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { BOOKING_STATUSES } from '../lib/constants';
 import { getDeptColor, getDeptBg, getDeptName, formatTime } from '../lib/utils';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -24,8 +25,29 @@ const fadeUp = {
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
-  const bookings = MOCK_BOOKINGS;
-  const rooms = MOCK_OR_ROOMS;
+  const { bookings, updateBooking } = useBookingsStore();
+  const { rooms } = useORRoomsStore();
+
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [denyingId, setDenyingId] = useState<string | null>(null);
+
+  const handleApprove = async (id: string) => {
+    setApprovingId(id);
+    try {
+      await updateBooking(id, { status: 'approved' });
+      toast.success('Booking approved');
+    } catch { toast.error('Failed to approve'); }
+    finally { setApprovingId(null); }
+  };
+
+  const handleDeny = async (id: string) => {
+    setDenyingId(id);
+    try {
+      await updateBooking(id, { status: 'denied' });
+      toast.success('Booking denied');
+    } catch { toast.error('Failed to deny'); }
+    finally { setDenyingId(null); }
+  };
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -222,8 +244,8 @@ export default function DashboardPage() {
                       <p className="text-xs text-gray-400 mt-0.5">{formatTime(b.start_time)}–{formatTime(b.end_time)}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button variant="accent" size="sm">Approve</Button>
-                      <Button variant="outline" size="sm">Deny</Button>
+                      <Button variant="accent" size="sm" loading={approvingId === b.id} onClick={() => handleApprove(b.id)}>Approve</Button>
+                      <Button variant="outline" size="sm" loading={denyingId === b.id} onClick={() => handleDeny(b.id)}>Deny</Button>
                     </div>
                   </div>
                 </div>

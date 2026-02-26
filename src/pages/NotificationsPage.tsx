@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, CheckCheck } from 'lucide-react';
-import { MOCK_NOTIFICATIONS } from '../lib/mockData';
+import { useNotificationsStore } from '../stores/appStore';
+import { useAuthStore } from '../stores/authStore';
 import Button from '../components/ui/Button';
 import { CustomSelect } from '../components/ui/CustomSelect';
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const { user } = useAuthStore();
+  const { notifications, markAsRead, markAllAsRead } = useNotificationsStore();
   const [filterType, setFilterType] = useState('all');
 
   const unread = notifications.filter((n) => !n.is_read).length;
@@ -17,12 +19,12 @@ export default function NotificationsPage() {
     return notifications.filter((n) => n.type === filterType);
   }, [notifications, filterType]);
 
-  const markAllRead = () => {
-    setNotifications((ns) => ns.map((n) => ({ ...n, is_read: true })));
+  const handleMarkAllRead = () => {
+    if (user) markAllAsRead(user.id);
   };
 
-  const markRead = (id: string) => {
-    setNotifications((ns) => ns.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+  const handleMarkRead = (id: string) => {
+    markAsRead(id);
   };
 
   const typeIcon = (type: string) => {
@@ -58,7 +60,7 @@ export default function NotificationsPage() {
             ]}
           />
           {unread > 0 && (
-            <Button variant="secondary" size="sm" icon={<CheckCheck className="w-4 h-4" />} onClick={markAllRead}>
+            <Button variant="secondary" size="sm" icon={<CheckCheck className="w-4 h-4" />} onClick={handleMarkAllRead}>
               Mark All Read
             </Button>
           )}
@@ -81,7 +83,7 @@ export default function NotificationsPage() {
               className={`px-4 md:px-6 py-3 md:py-4 flex items-start gap-3 cursor-pointer active:bg-gray-50 transition-colors ${
                 !n.is_read ? 'bg-accent-50/40' : ''
               }`}
-              onClick={() => markRead(n.id)}
+              onClick={() => handleMarkRead(n.id)}
             >
               <span className="text-lg flex-shrink-0 mt-0.5">{typeIcon(n.type)}</span>
               <div className="flex-1 min-w-0">

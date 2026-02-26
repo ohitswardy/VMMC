@@ -89,7 +89,7 @@ INSERT INTO public.or_rooms (number, name, designation) VALUES
 -- =============================================
 CREATE TABLE public.or_room_live_status (
   room_id UUID PRIMARY KEY REFERENCES public.or_rooms(id) ON DELETE CASCADE,
-  status TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('idle', 'ongoing', 'ended')),
+  status TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('idle', 'in_transit', 'ongoing', 'ended', 'deferred')),
   current_booking_id UUID,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -128,7 +128,9 @@ CREATE TABLE public.bookings (
   ward TEXT NOT NULL,
   procedure_name TEXT NOT NULL,
   surgeon TEXT NOT NULL,
-  anesthesiologist TEXT NOT NULL,
+  anesthesiologist TEXT DEFAULT '',          -- NULL/empty for non-CP; assigned later by Anesthesiology dept
+  scrub_nurse TEXT DEFAULT '',
+  circulating_nurse TEXT DEFAULT '',
   clearance_availability BOOLEAN DEFAULT true,
   special_equipment TEXT[] DEFAULT '{}',
   estimated_duration_minutes INT NOT NULL CHECK (estimated_duration_minutes > 0),
@@ -416,12 +418,88 @@ CREATE TRIGGER update_change_requests_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
--- 11. REALTIME SUBSCRIPTIONS
+-- 11. OR PRIORITY SCHEDULE
+-- =============================================
+-- Stores which department has OR priority on which weekday,
+-- and optionally the specific anesthesiologist(s) assigned.
+-- Managed exclusively by anesthesiology_admin.
+CREATE TABLE public.or_priority_schedule (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  department_id TEXT NOT NULL CHECK (department_id IN (
+    'GS','OBGYNE','ORTHO','OPHTHA','ENT','PEDIA','URO','TCVS','NEURO',
+    'PLASTICS','PSYCH','DENTAL','GI','RADIO','PULMO','CARDIAC','ONCO'
+  )),
+  weekday TEXT NOT NULL CHECK (weekday IN ('Monday','Tuesday','Wednesday','Thursday','Friday')),
+  priority_label TEXT NOT NULL DEFAULT 'PRIORITY',  -- e.g., 'PRIORITY', 'PRIORITY OPEN', 'Dr. Cruz, Dr. Ong'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (department_id, weekday)
+);
+
+CREATE INDEX idx_priority_schedule_day ON public.or_priority_schedule(weekday);
+
+ALTER TABLE public.or_priority_schedule ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Priority schedule viewable by all authenticated"
+  ON public.or_priority_schedule FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Anesthesiology admins can manage priority schedule"
+  ON public.or_priority_schedule FOR ALL
+  TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('super_admin', 'anesthesiology_admin'))
+  );
+
+CREATE TRIGGER update_priority_schedule_updated_at
+  BEFORE UPDATE ON public.or_priority_schedule
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Seed default priority schedule (based on VMMC proposed OR schedule)
+INSERT INTO public.or_priority_schedule (department_id, weekday, priority_label) VALUES
+  -- GS: specific anesthesiologists per day
+  ('GS', 'Monday',    'Dr. Littaua, Dr. Taplac'),
+  ('GS', 'Tuesday',   'Dr. Ocampo'),
+  ('GS', 'Wednesday', 'Dr. Cruz, Dr. Ong'),
+  ('GS', 'Thursday',  'Dr. Bartolome, Dr. Andres, Dr. RM Santos'),
+  ('GS', 'Friday',    'Dr. Yabut, Dr. Guerrero'),
+  -- Urology
+  ('URO', 'Monday',    'PRIORITY'),
+  ('URO', 'Wednesday', 'PRIORITY OPEN'),
+  ('URO', 'Friday',    'PRIORITY NON-OPEN (ENDOSCOPY)'),
+  -- Orthopedics
+  ('ORTHO', 'Monday',  'PRIORITY'),
+  ('ORTHO', 'Tuesday', 'PRIORITY'),
+  ('ORTHO', 'Friday',  'PRIORITY'),
+  -- TCVS
+  ('TCVS', 'Wednesday', 'PRIORITY'),
+  -- Neurosurgery
+  ('NEURO', 'Wednesday', 'PRIORITY'),
+  ('NEURO', 'Friday',    'PRIORITY'),
+  -- Plastics
+  ('PLASTICS', 'Wednesday', 'PRIORITY'),
+  ('PLASTICS', 'Friday',    'PRIORITY'),
+  -- Pediatrics
+  ('PEDIA', 'Monday', 'PRIORITY'),
+  -- OB-GYNE
+  ('OBGYNE', 'Tuesday',  'PRIORITY'),
+  ('OBGYNE', 'Thursday', 'PRIORITY'),
+  -- Ophthalmology
+  ('OPHTHA', 'Tuesday',  'PRIORITY'),
+  ('OPHTHA', 'Thursday', 'PRIORITY'),
+  -- ENT
+  ('ENT', 'Tuesday',  'PRIORITY'),
+  ('ENT', 'Thursday', 'PRIORITY');
+
+-- =============================================
+-- 12. REALTIME SUBSCRIPTIONS
 -- =============================================
 -- Enable realtime for live updates
 ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.or_room_live_status;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.or_priority_schedule;
 
 -- =============================================
 -- 12. AUTO-CREATE PROFILE ON SIGNUP

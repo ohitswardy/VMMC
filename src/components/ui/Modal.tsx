@@ -6,6 +6,7 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  titleExtra?: ReactNode;
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
@@ -17,7 +18,7 @@ const sizeClasses = {
   xl: 'md:max-w-4xl',
 };
 
-export default function Modal({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, titleExtra, children, size = 'lg' }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'lg' }:
 
           {/* Panel — bottom sheet on mobile, centered on desktop */}
           <motion.div
-            className={`relative w-full ${sizeClasses[size]} bg-white rounded-t-[16px] md:rounded-[12px] overflow-hidden max-h-[92vh] md:max-h-[85vh]`}
+            className={`relative w-full ${sizeClasses[size]} bg-white rounded-t-[16px] md:rounded-[12px] overflow-hidden max-h-[92vh] md:max-h-[85vh] flex flex-col`}
             style={{ boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.15)' }}
             initial={{ y: '100%', opacity: 1 }}
             animate={{ y: 0, opacity: 1 }}
@@ -63,7 +64,10 @@ export default function Modal({ isOpen, onClose, title, children, size = 'lg' }:
 
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3.5 md:px-6 md:py-4 border-b border-gray-100">
-              <h2 className="text-[15px] md:text-base font-semibold text-gray-900">{title}</h2>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <h2 className="text-[15px] md:text-base font-semibold text-gray-900 shrink-0">{title}</h2>
+                {titleExtra && <span className="text-[11px] text-gray-500 truncate">{titleExtra}</span>}
+              </div>
               <button
                 onClick={onClose}
                 className="p-2 -mr-1 rounded-[8px] hover:bg-gray-100 active:bg-gray-150 transition-colors touch-target"
@@ -74,7 +78,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'lg' }:
             </div>
 
             {/* Body */}
-            <div className="px-5 py-5 md:px-6 md:py-6 overflow-y-auto" style={{ maxHeight: 'calc(92vh - 56px)' }}>
+            <div className="px-5 py-5 md:px-6 md:py-6 overflow-y-auto flex-1 min-h-0">
               {children}
             </div>
           </motion.div>

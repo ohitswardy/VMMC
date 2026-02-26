@@ -10,13 +10,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key',
+  supabaseUrl || 'https://chfiefxeschdmnihsvvb.supabase.co',
+  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZmllZnhlc2NoZG1uaWhzdnZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjU0NTgsImV4cCI6MjA4NzY0MTQ1OH0.adyo3GBkW9sV-iwdDuKzWRL0HqRzVNjjsx6HoPaduOw',
   {
+    db: { schema: 'public' },
     auth: {
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: false,
     },
     realtime: {
       params: {

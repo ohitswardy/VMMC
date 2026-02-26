@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Download, Calendar, FileSpreadsheet, Printer, ChevronRight } from 'lucide-react';
+import { FileText, Calendar } from 'lucide-react';
 import { format, subDays, eachDayOfInterval } from 'date-fns';
-import { MOCK_BOOKINGS, MOCK_OR_ROOMS } from '../lib/mockData';
-import { getDeptName, getDeptColor, getDeptBg, formatTime } from '../lib/utils';
+import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
+import { getDeptName, getDeptColor, formatTime } from '../lib/utils';
+import { generateSchedulePDF } from '../lib/generateSchedulePDF';
 import Button from '../components/ui/Button';
 import { DatePicker } from '../components/ui/DatePicker';
-import toast from 'react-hot-toast';
 
 export default function DocumentsPage() {
-  const bookings = MOCK_BOOKINGS;
-  const rooms = MOCK_OR_ROOMS;
+  const { bookings } = useBookingsStore();
+  const { rooms } = useORRoomsStore();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const last7Days = eachDayOfInterval({
@@ -28,16 +28,8 @@ export default function DocumentsPage() {
         return a.start_time.localeCompare(b.start_time);
       });
 
-  const handleDownloadPDF = (date: string) => {
-    toast.success(`Generating PDF for ${date}...`);
-  };
-
-  const handleDownloadExcel = (date: string) => {
-    toast.success(`Generating Excel for ${date}...`);
-  };
-
-  const handleBulkDownload = () => {
-    toast.success('Generating bulk schedule sheets...');
+  const handleDownloadPDF = async (date: string) => {
+    await generateSchedulePDF(date, bookings, rooms);
   };
 
   const dayBookings = getBookingsForDate(selectedDate);
@@ -49,15 +41,6 @@ export default function DocumentsPage() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Documents</h1>
           <p className="text-xs md:text-sm text-gray-500 mt-0.5">Download OR schedule sheets</p>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Download className="w-4 h-4" />}
-          onClick={handleBulkDownload}
-          className="self-start sm:self-auto"
-        >
-          Bulk Download
-        </Button>
       </div>
 
       {/* ─── Mobile: Date selector as horizontal scroll chips ─── */}
@@ -134,8 +117,6 @@ export default function DocumentsPage() {
           {/* Download actions — horizontal scroll on mobile */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <Button size="sm" icon={<FileText className="w-4 h-4" />} onClick={() => handleDownloadPDF(selectedDate)}>PDF</Button>
-            <Button variant="accent" size="sm" icon={<FileSpreadsheet className="w-4 h-4" />} onClick={() => handleDownloadExcel(selectedDate)}>Excel</Button>
-            <Button variant="secondary" size="sm" icon={<Printer className="w-4 h-4" />} onClick={() => window.print()}>Print</Button>
           </div>
 
           {/* Schedule sheet preview */}

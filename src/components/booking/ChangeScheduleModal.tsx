@@ -7,8 +7,9 @@ import { CustomSelect } from '../ui/CustomSelect';
 import { DatePicker } from '../ui/DatePicker';
 import { TimePicker } from '../ui/TimePicker';
 import { useAuthStore } from '../../stores/authStore';
-import { DEPARTMENTS, CHANGE_REASONS, IM_SUBSPECIALTIES } from '../../lib/constants';
-import { canModifyBooking, generateId } from '../../lib/utils';
+import { useChangeRequestsStore } from '../../stores/appStore';
+import { DEPARTMENTS, CHANGE_REASONS, IM_SUBSPECIALTIES, ANES_DEPARTMENT_CONTACT } from '../../lib/constants';
+import { canModifyBooking } from '../../lib/utils';
 import type { Booking } from '../../lib/types';
 
 interface Props {
@@ -19,7 +20,10 @@ interface Props {
 
 export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props) {
   const { user } = useAuthStore();
-  const canModify = canModifyBooking(booking);
+  const { addRequest } = useChangeRequestsStore();
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
+  // Anes admin can override all booking change restrictions
+  const canModify = isAdmin || canModifyBooking(booking);
 
   const [form, setForm] = useState({
     department_id: booking.department_id,
@@ -48,11 +52,25 @@ export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props)
     }
 
     setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 600));
-
-    toast.success('Change request submitted successfully!');
-    setIsSubmitting(false);
-    onClose();
+    try {
+      await addRequest({
+        booking_id: booking.id,
+        requested_by: user?.id || '',
+        department_id: form.department_id,
+        new_date: form.new_date,
+        new_start_time: form.new_preferred_time,
+        reason: form.reason === 'Others' ? (form.reason_other || form.reason) : form.reason,
+        notes: form.additional_info || undefined,
+        status: 'pending',
+      } as any);
+      toast.success('Change request submitted successfully!');
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to submit change request.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!canModify) {
@@ -66,13 +84,15 @@ export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props)
           <p className="text-sm text-gray-500 mb-6">
             Changes can only be made at least 24 hours before the scheduled time.
           </p>
-          <div className="p-4 bg-blue-50 rounded-[10px]">
+          <div className="p-4 bg-blue-50 rounded-[10px] space-y-2">
             <p className="text-sm font-medium text-blue-800">
-              Please contact the Department of Anesthesia
+              Please contact the {ANES_DEPARTMENT_CONTACT.name}
             </p>
-            <p className="text-xs text-blue-600 mt-1">
+            <p className="text-xs text-blue-600">
               For urgent changes within 24 hours of the scheduled procedure
             </p>
+            <p className="text-xs text-blue-700 font-medium mt-1">📞 {ANES_DEPARTMENT_CONTACT.phone}</p>
+            <p className="text-xs text-blue-700 font-medium">✉️ {ANES_DEPARTMENT_CONTACT.email}</p>
           </div>
           <Button variant="secondary" className="mt-6" onClick={onClose}>
             Close

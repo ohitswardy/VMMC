@@ -1,14 +1,16 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
-import { useState } from 'react';
-import { MOCK_BOOKINGS, MOCK_OR_ROOMS } from '../lib/mockData';
+import { useORRoomsStore } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { DEPARTMENTS, BOOKING_STATUSES } from '../lib/constants';
 import { getDeptColor, getDeptName, formatTime } from '../lib/utils';
 import StatusBadge from '../components/ui/StatusBadge';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import { useBookingsStore } from '../stores/appStore';
+import BookingDetailModal from '../components/booking/BookingDetailModal';
+import ChangeScheduleModal from '../components/booking/ChangeScheduleModal';
+import type { Booking } from '../lib/types';
 
 const fadeUp = {
   initial: { opacity: 0, y: 10 },
@@ -18,12 +20,13 @@ const fadeUp = {
 
 export default function BookingsPage() {
   const { user } = useAuthStore();
-  const { openChangeForm } = useBookingsStore();
-  const bookings = MOCK_BOOKINGS;
-  const rooms = MOCK_OR_ROOMS;
+  const { openChangeForm, isChangeFormOpen, changeBooking, closeChangeForm } = useBookingsStore();
+  const { bookings } = useBookingsStore();
+  const { rooms } = useORRoomsStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
 
@@ -105,9 +108,10 @@ export default function BookingsPage() {
               key={b.id}
               {...fadeUp}
               transition={{ ...fadeUp.transition, delay: Math.min(i * 0.03, 0.3) }}
-              className="bg-white rounded-[10px] border border-gray-200 overflow-hidden hover:shadow-sm active:shadow-sm transition-shadow"
+              className="bg-white rounded-[10px] border border-gray-200 overflow-hidden hover:shadow-sm active:shadow-sm transition-shadow cursor-pointer"
+              onClick={() => setSelectedBooking(b)}
             >
-              {/* Dept color bar — 2px, not 6px */}
+              {/* Dept color bar */}
               <div className="h-[2px]" style={{ backgroundColor: getDeptColor(b.department_id) }} />
               <div className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
@@ -147,15 +151,9 @@ export default function BookingsPage() {
                   </div>
                 )}
 
-                {(user?.department_id === b.department_id || isAdmin) &&
-                 !['completed', 'cancelled', 'denied', 'ongoing'].includes(b.status) && (
-                  <button
-                    onClick={() => openChangeForm(b)}
-                    className="w-full text-center text-[13px] text-accent-600 hover:text-accent-700 active:text-accent-800 font-semibold transition-colors pt-2 border-t border-gray-100 touch-target"
-                  >
-                    Request Change
-                  </button>
-                )}
+                <p className="text-[12px] text-gray-400 pt-1 border-t border-gray-100">
+                  Tap to view details{isAdmin && b.status === 'pending' ? ' · Approve / Edit' : ''}
+                </p>
               </div>
             </motion.div>
           );
@@ -164,6 +162,25 @@ export default function BookingsPage() {
 
       {filtered.length === 0 && (
         <div className="text-center py-20 text-sm text-gray-400">No bookings found.</div>
+      )}
+
+      {/* Detail modal */}
+      {selectedBooking && (
+        <BookingDetailModal
+          isOpen={!!selectedBooking}
+          onClose={() => setSelectedBooking(null)}
+          booking={selectedBooking}
+          rooms={rooms}
+        />
+      )}
+
+      {/* Change schedule modal */}
+      {changeBooking && (
+        <ChangeScheduleModal
+          isOpen={isChangeFormOpen}
+          onClose={closeChangeForm}
+          booking={changeBooking}
+        />
       )}
     </div>
   );

@@ -10,17 +10,20 @@ import { useAuthStore } from '../../stores/authStore';
 import { useNotificationsStore } from '../../stores/appStore';
 
 const navItems = [
-  { to: '/calendar', icon: Calendar, label: 'Calendar', roles: ['super_admin', 'anesthesiology_admin', 'department_user', 'viewer'] },
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['super_admin', 'anesthesiology_admin'] },
-  { to: '/live-board', icon: Activity, label: 'Live Board', roles: ['super_admin', 'anesthesiology_admin', 'department_user', 'viewer'] },
-  { to: '/bookings', icon: ClipboardList, label: 'Bookings', roles: ['super_admin', 'anesthesiology_admin', 'department_user'] },
-  { to: '/or-rooms', icon: Building2, label: 'OR Rooms', roles: ['super_admin', 'anesthesiology_admin'] },
-  { to: '/notifications', icon: Bell, label: 'Alerts', roles: ['super_admin', 'anesthesiology_admin', 'department_user', 'viewer'] },
-  { to: '/reports', icon: BarChart3, label: 'Reports', roles: ['super_admin', 'anesthesiology_admin'] },
-  { to: '/documents', icon: FileText, label: 'Docs', roles: ['super_admin', 'anesthesiology_admin', 'department_user'] },
-  { to: '/audit-logs', icon: Shield, label: 'Audit', roles: ['super_admin', 'anesthesiology_admin'] },
-  { to: '/users', icon: Users, label: 'Users', roles: ['super_admin'] },
-  { to: '/settings', icon: Settings, label: 'Settings', roles: ['super_admin', 'anesthesiology_admin'] },
+  { to: '/calendar',      icon: Calendar,       label: 'Calendar',  roles: ['super_admin', 'anesthesiology_admin', 'department_user', 'nurse', 'viewer'] },
+  { to: '/dashboard',     icon: LayoutDashboard,label: 'Dashboard', roles: ['super_admin', 'anesthesiology_admin'] },
+  { to: '/live-board',    icon: Activity,       label: 'Live Board',roles: ['super_admin', 'anesthesiology_admin', 'department_user', 'viewer'] },
+  { to: '/bookings',      icon: ClipboardList,  label: 'Bookings',  roles: ['super_admin', 'anesthesiology_admin', 'department_user'] },
+  // Nurses get OR Rooms access only to manage nurse-on-duty assignments
+  { to: '/or-rooms',      icon: Building2,      label: 'OR Rooms',  roles: ['super_admin', 'anesthesiology_admin', 'nurse'] },
+  { to: '/notifications', icon: Bell,           label: 'Alerts',    roles: ['super_admin', 'anesthesiology_admin', 'department_user', 'nurse', 'viewer'] },
+  // Reports: super_admin only
+  { to: '/reports',       icon: BarChart3,      label: 'Reports',   roles: ['super_admin'] },
+  // Documents: super_admin + anesthesiology_admin only (not department_user)
+  { to: '/documents',     icon: FileText,       label: 'Docs',      roles: ['super_admin', 'anesthesiology_admin'] },
+  { to: '/audit-logs',    icon: Shield,         label: 'Audit',     roles: ['super_admin', 'anesthesiology_admin'] },
+  { to: '/users',         icon: Users,          label: 'Users',     roles: ['super_admin'] },
+  { to: '/settings',      icon: Settings,       label: 'Settings',  roles: ['super_admin', 'anesthesiology_admin'] },
 ];
 
 export default function Sidebar() {

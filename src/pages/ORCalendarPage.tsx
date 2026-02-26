@@ -2,16 +2,15 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Plus, AlertTriangle,
-  Clock, User, MapPin
+  Clock, User, MapPin, Printer
 } from 'lucide-react';
 import {
   format, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval,
   isToday, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths,
   subMonths, isSameMonth, isSameDay
 } from 'date-fns';
-import { useBookingsStore } from '../stores/appStore';
+import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
-import { MOCK_BOOKINGS, MOCK_OR_ROOMS } from '../lib/mockData';
 import { getDeptColor, getDeptBg, getDeptName, formatTime, generateTimeSlots } from '../lib/utils';
 import type { Booking, ORRoom } from '../lib/types';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -19,6 +18,7 @@ import Button from '../components/ui/Button';
 import BookingFormModal from '../components/booking/BookingFormModal';
 import ChangeScheduleModal from '../components/booking/ChangeScheduleModal';
 import BookingDetailModal from '../components/booking/BookingDetailModal';
+import { generateSchedulePDF } from '../lib/generateSchedulePDF';
 
 type ViewMode = 'day' | 'week' | 'month';
 
@@ -33,12 +33,17 @@ export default function ORCalendarPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [mobileRoomIdx, setMobileRoomIdx] = useState(0);
 
-  const rooms = MOCK_OR_ROOMS;
-  const bookings = MOCK_BOOKINGS;
+  const { rooms } = useORRoomsStore();
+  const { bookings } = useBookingsStore();
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
   const isDeptUser = user?.role === 'department_user';
   const canBook = isAdmin || isDeptUser;
+
+  const handlePrintPDF = async () => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    await generateSchedulePDF(dateStr, bookings, rooms);
+  };
 
   /* -- navigation -- */
   const navigate = (dir: 'prev' | 'next') => {
@@ -121,6 +126,13 @@ export default function ORCalendarPage() {
           <p>Interactive operating room calendar</p>
         </div>
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button variant="secondary" size="sm" icon={<Printer className="w-4 h-4" />}
+              className="hidden sm:inline-flex"
+              onClick={handlePrintPDF}>
+              Print PDF
+            </Button>
+          )}
           {isAdmin && (
             <Button variant="danger" size="sm" icon={<AlertTriangle className="w-4 h-4" />}
               className="hidden sm:inline-flex"
