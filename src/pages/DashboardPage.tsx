@@ -232,7 +232,12 @@ export default function DashboardPage() {
               </span>
             </div>
             <div className="divide-y divide-gray-50">
-              {bookings.filter((b) => b.status === 'pending').map((b) => (
+              {[...bookings.filter((b) => b.status === 'pending')].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((b) => {
+                const submittedAt = new Date(b.created_at).toLocaleString(undefined, {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                  hour: 'numeric', minute: '2-digit',
+                });
+                return (
                 <div key={b.id} className="px-4 md:px-5 py-3.5 hover:bg-gray-50 active:bg-gray-50 transition-colors">
                   <div className="flex items-start gap-3">
                     <div className="w-1 h-10 md:h-8 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: getDeptColor(b.department_id) }} />
@@ -241,7 +246,14 @@ export default function DashboardPage() {
                       <p className="text-[13px] text-gray-500 mt-0.5">
                         {getDeptName(b.department_id)} · {b.patient_name}
                       </p>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatTime(b.start_time)}–{formatTime(b.end_time)}</p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <p className="text-xs text-gray-400">{formatTime(b.start_time)}–{formatTime(b.end_time)}</p>
+                        <span className="text-[10px] text-gray-400">·</span>
+                        <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Submitted {submittedAt}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <Button variant="accent" size="sm" loading={approvingId === b.id} onClick={() => handleApprove(b.id)}>Approve</Button>
@@ -249,7 +261,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
               {stats.pending === 0 && (
                 <div className="px-4 py-10 text-center text-sm text-gray-400">No pending requests</div>
               )}
@@ -294,6 +306,10 @@ export default function DashboardPage() {
           <div className="md:hidden divide-y divide-gray-50">
             {filtered.map((b) => {
               const room = rooms.find((r) => r.id === b.or_room_id);
+              const submittedAt = new Date(b.created_at).toLocaleString(undefined, {
+                month: 'short', day: 'numeric', year: 'numeric',
+                hour: 'numeric', minute: '2-digit',
+              });
               return (
                 <div key={b.id} className="px-4 py-3.5 active:bg-gray-50 transition-colors">
                   <div className="flex items-start gap-3">
@@ -310,6 +326,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-gray-400">
                         {formatTime(b.start_time)}–{formatTime(b.end_time)} · {b.surgeon.split('/')[0]}
                       </p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Submitted {submittedAt}</p>
                     </div>
                   </div>
                 </div>
@@ -327,12 +344,17 @@ export default function DashboardPage() {
                   <th className="text-left text-[11px] font-medium text-gray-400 uppercase tracking-wider px-5 py-2.5">Procedure</th>
                   <th className="text-left text-[11px] font-medium text-gray-400 uppercase tracking-wider px-5 py-2.5">Date/Time</th>
                   <th className="text-left text-[11px] font-medium text-gray-400 uppercase tracking-wider px-5 py-2.5">Room</th>
+                  <th className="text-left text-[11px] font-medium text-gray-400 uppercase tracking-wider px-5 py-2.5">Submitted</th>
                   <th className="text-left text-[11px] font-medium text-gray-400 uppercase tracking-wider px-5 py-2.5">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map((b) => {
                   const room = rooms.find((r) => r.id === b.or_room_id);
+                  const submittedAt = new Date(b.created_at).toLocaleString(undefined, {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                    hour: 'numeric', minute: '2-digit',
+                  });
                   return (
                     <tr key={b.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-3">
@@ -348,6 +370,7 @@ export default function DashboardPage() {
                         <span className="text-xs text-gray-400">{formatTime(b.start_time)}–{formatTime(b.end_time)}</span>
                       </td>
                       <td className="px-5 py-3 text-[13px] text-gray-500">{room?.name || '—'}</td>
+                      <td className="px-5 py-3 text-[12px] text-gray-400 whitespace-nowrap">{submittedAt}</td>
                       <td className="px-5 py-3"><StatusBadge status={b.status} size="sm" /></td>
                     </tr>
                   );

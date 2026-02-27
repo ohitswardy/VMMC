@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronLeft, ChevronRight, CalendarDays, Clock, ChevronDown } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, CalendarDays, Clock, ChevronDown, CalendarRange } from 'lucide-react';
 import {
   format, addDays, subDays, isToday, addMonths, subMonths,
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
@@ -15,7 +15,7 @@ import { CustomSelect } from '../components/ui/CustomSelect';
 import { useBookingsStore } from '../stores/appStore';
 import BookingDetailModal from '../components/booking/BookingDetailModal';
 import ChangeScheduleModal from '../components/booking/ChangeScheduleModal';
-import type { Booking } from '../lib/types';
+import type { Booking, ORRoom } from '../lib/types';
 
 const fadeUp = {
   initial: { opacity: 0, y: 10 },
@@ -184,6 +184,85 @@ function DayPickerPopover({
   );
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Reusable booking card used in both Day and 2-Week views
+───────────────────────────────────────────────────────────── */
+function BookingCard({
+  booking: b, index: i, rooms, isAdmin, onSelect,
+}: {
+  booking: Booking;
+  index: number;
+  rooms: ORRoom[];
+  isAdmin: boolean;
+  onSelect: (b: Booking) => void;
+}) {
+  const room = rooms.find((r) => r.id === b.or_room_id);
+  const submittedAt = new Date(b.created_at).toLocaleString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+  return (
+    <motion.div
+      {...fadeUp}
+      transition={{ ...fadeUp.transition, delay: Math.min(i * 0.03, 0.3) }}
+      className="bg-white rounded-[10px] border border-gray-200 overflow-hidden hover:shadow-sm active:shadow-sm transition-shadow cursor-pointer"
+      onClick={() => onSelect(b)}
+    >
+      {/* Dept color bar */}
+      <div className="h-[2px]" style={{ backgroundColor: getDeptColor(b.department_id) }} />
+      <div className="p-4 space-y-3">
+        {/* Top row: procedure + status */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[14px] font-semibold text-gray-900 truncate">{b.procedure}</p>
+            <p className="text-[13px] text-gray-500 mt-0.5">{b.patient_name} ({b.patient_age}/{b.patient_sex})</p>
+          </div>
+          <StatusBadge status={b.status} size="sm" />
+        </div>
+
+        {/* Scheduled time — prominent */}
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
+          <Clock className="w-3.5 h-3.5 text-accent-500 shrink-0" />
+          <span className="text-[13px] font-bold text-gray-800">
+            {formatTime(b.start_time)} – {formatTime(b.end_time)}
+          </span>
+          <span className="ml-auto text-[11px] text-gray-400 shrink-0">{room?.name ?? '—'}</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
+          <div>
+            <span className="text-gray-400">Dept</span>
+            <span className="ml-1.5 font-medium" style={{ color: getDeptColor(b.department_id) }}>{getDeptName(b.department_id)}</span>
+          </div>
+          <div>
+            <span className="text-gray-400">Ward</span>
+            <span className="ml-1.5 text-gray-600">{b.ward || '—'}</span>
+          </div>
+          <div className="col-span-2">
+            <span className="text-gray-400">Surgeon</span>
+            <span className="ml-1.5 text-gray-600">{b.surgeon}</span>
+          </div>
+        </div>
+
+        {b.is_emergency && (
+          <div className="px-2.5 py-1.5 rounded-[6px] bg-red-50 border border-red-100 text-[11px] font-semibold text-red-600">
+            🚨 Emergency Case
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+          <p className="text-[11px] text-gray-400">
+            Submitted {submittedAt}
+          </p>
+          {isAdmin && b.status === 'pending' && (
+            <span className="text-[11px] font-medium text-accent-600">Approve / Edit →</span>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function BookingsPage() {
   const { user } = useAuthStore();
   const { isChangeFormOpen, changeBooking, closeChangeForm } = useBookingsStore();
@@ -194,15 +273,21 @@ export default function BookingsPage() {
   const [deptFilter, setDeptFilter] = useState('all');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  const [viewMode, setViewMode] = useState<'day' | '2week'>('day');
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
   const dateStr = format(currentDate, 'yyyy-MM-dd');
+  const endDateStr = format(addDays(currentDate, 13), 'yyyy-MM-dd');
 
   const filtered = useMemo(() => {
     let result = bookings;
 
-    // ── Scope to current date (daily pagination) ──
-    result = result.filter((b) => b.date === dateStr);
+    // ── Scope to date range based on view mode ──
+    if (viewMode === '2week' && isAdmin) {
+      result = result.filter((b) => b.date >= dateStr && b.date <= endDateStr);
+    } else {
+      result = result.filter((b) => b.date === dateStr);
+    }
 
     if (!isAdmin && user?.department_id) {
       result = result.filter((b) => b.department_id === user.department_id);
@@ -223,9 +308,32 @@ export default function BookingsPage() {
       );
     }
 
-    // ── Sort by start_time ascending ──
-    return [...result].sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [bookings, search, statusFilter, deptFilter, isAdmin, user, dateStr]);
+    // ── Sort by date then start_time ascending ──
+    return [...result].sort((a, b) => a.date.localeCompare(b.date) || a.start_time.localeCompare(b.start_time));
+  }, [bookings, search, statusFilter, deptFilter, isAdmin, user, dateStr, endDateStr, viewMode]);
+
+  // Group bookings by date for the 2-week view
+  const groupedByDate = useMemo(() => {
+    if (viewMode !== '2week') return [];
+    const map = new Map<string, Booking[]>();
+    for (const b of filtered) {
+      const list = map.get(b.date) || [];
+      list.push(b);
+      map.set(b.date, list);
+    }
+    // Fill in all 14 days even if empty
+    const days: { date: string; label: string; bookings: Booking[] }[] = [];
+    for (let i = 0; i < 14; i++) {
+      const d = addDays(currentDate, i);
+      const ds = format(d, 'yyyy-MM-dd');
+      days.push({
+        date: ds,
+        label: format(d, 'EEE, MMM d'),
+        bookings: map.get(ds) || [],
+      });
+    }
+    return days;
+  }, [filtered, viewMode, currentDate]);
 
   const goTo = (dir: 'prev' | 'next') =>
     setCurrentDate((d) => (dir === 'next' ? addDays(d, 1) : subDays(d, 1)));
@@ -270,6 +378,33 @@ export default function BookingsPage() {
             </button>
           )}
         </div>
+
+        {/* View mode toggle — admin only */}
+        {isAdmin && (
+          <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-[10px] px-1 py-1 self-start sm:self-auto">
+            <button
+              onClick={() => setViewMode('day')}
+              className={`px-2.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+                viewMode === 'day'
+                  ? 'bg-accent-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              Day
+            </button>
+            <button
+              onClick={() => setViewMode('2week')}
+              className={`px-2.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors flex items-center gap-1.5 ${
+                viewMode === '2week'
+                  ? 'bg-accent-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <CalendarRange className="w-3.5 h-3.5" />
+              2 Weeks
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -311,95 +446,97 @@ export default function BookingsPage() {
 
       {/* Count summary */}
       <p className="text-[12px] text-gray-400 -mt-1">
-        {filtered.length} booking{filtered.length !== 1 ? 's' : ''} on{' '}
-        <span className="font-medium text-gray-600">{format(currentDate, 'MMMM d, yyyy')}</span>
+        {filtered.length} booking{filtered.length !== 1 ? 's' : ''}{' '}
+        {viewMode === '2week' && isAdmin ? (
+          <>from <span className="font-medium text-gray-600">{format(currentDate, 'MMM d')}</span> to <span className="font-medium text-gray-600">{format(addDays(currentDate, 13), 'MMM d, yyyy')}</span></>
+        ) : (
+          <>on <span className="font-medium text-gray-600">{format(currentDate, 'MMMM d, yyyy')}</span></>
+        )}
       </p>
 
-      {/* Cards */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={dateStr}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.18 }}
-          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4"
-        >
-          {filtered.map((b, i) => {
-            const room = rooms.find((r) => r.id === b.or_room_id);
-            const submittedAt = new Date(b.created_at).toLocaleString(undefined, {
-              month: 'short', day: 'numeric', year: 'numeric',
-              hour: 'numeric', minute: '2-digit',
-            });
-            return (
-              <motion.div
-                key={b.id}
-                {...fadeUp}
-                transition={{ ...fadeUp.transition, delay: Math.min(i * 0.03, 0.3) }}
-                className="bg-white rounded-[10px] border border-gray-200 overflow-hidden hover:shadow-sm active:shadow-sm transition-shadow cursor-pointer"
-                onClick={() => setSelectedBooking(b)}
-              >
-                {/* Dept color bar */}
-                <div className="h-[2px]" style={{ backgroundColor: getDeptColor(b.department_id) }} />
-                <div className="p-4 space-y-3">
-                  {/* Top row: procedure + status */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[14px] font-semibold text-gray-900 truncate">{b.procedure}</p>
-                      <p className="text-[13px] text-gray-500 mt-0.5">{b.patient_name} ({b.patient_age}/{b.patient_sex})</p>
-                    </div>
-                    <StatusBadge status={b.status} size="sm" />
-                  </div>
+      {/* Cards — Day view */}
+      {(viewMode === 'day' || !isAdmin) && (
+        <>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={dateStr}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4"
+            >
+              {filtered.map((b, i) => (
+                <BookingCard key={b.id} booking={b} index={i} rooms={rooms} isAdmin={isAdmin} onSelect={setSelectedBooking} />
+              ))}
+            </motion.div>
+          </AnimatePresence>
 
-                  {/* Scheduled time — prominent */}
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
-                    <Clock className="w-3.5 h-3.5 text-accent-500 shrink-0" />
-                    <span className="text-[13px] font-bold text-gray-800">
-                      {formatTime(b.start_time)} – {formatTime(b.end_time)}
-                    </span>
-                    <span className="ml-auto text-[11px] text-gray-400 shrink-0">{room?.name ?? '—'}</span>
-                  </div>
+          {filtered.length === 0 && (
+            <div className="text-center py-20 text-sm text-gray-400">
+              No bookings for {format(currentDate, 'MMMM d, yyyy')}.
+            </div>
+          )}
+        </>
+      )}
 
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
-                    <div>
-                      <span className="text-gray-400">Dept</span>
-                      <span className="ml-1.5 font-medium" style={{ color: getDeptColor(b.department_id) }}>{getDeptName(b.department_id)}</span>
+      {/* Cards — 2-Week view (admin only) */}
+      {viewMode === '2week' && isAdmin && (
+        <>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`2w-${dateStr}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+              className="space-y-4"
+            >
+              {groupedByDate.map((group) => {
+                const dateObj = new Date(group.date + 'T00:00:00');
+                const isGroupToday = isToday(dateObj);
+                return (
+                  <div key={group.date}>
+                    {/* Day header */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className={`text-[13px] font-bold ${
+                        isGroupToday ? 'text-accent-600' : 'text-gray-700'
+                      }`}>
+                        {isGroupToday ? 'Today · ' : ''}{group.label}
+                      </h3>
+                      <div className="flex-1 h-px bg-gray-100" />
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                        group.bookings.length > 0
+                          ? 'bg-accent-50 text-accent-700'
+                          : 'bg-gray-50 text-gray-400'
+                      }`}>
+                        {group.bookings.length}
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-gray-400">Ward</span>
-                      <span className="ml-1.5 text-gray-600">{b.ward || '—'}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-gray-400">Surgeon</span>
-                      <span className="ml-1.5 text-gray-600">{b.surgeon}</span>
-                    </div>
-                  </div>
 
-                  {b.is_emergency && (
-                    <div className="px-2.5 py-1.5 rounded-[6px] bg-red-50 border border-red-100 text-[11px] font-semibold text-red-600">
-                      🚨 Emergency Case
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                    <p className="text-[11px] text-gray-400">
-                      Submitted {submittedAt}
-                    </p>
-                    {isAdmin && b.status === 'pending' && (
-                      <span className="text-[11px] font-medium text-accent-600">Approve / Edit →</span>
+                    {group.bookings.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+                        {group.bookings.map((b, i) => (
+                          <BookingCard key={b.id} booking={b} index={i} rooms={rooms} isAdmin={isAdmin} onSelect={setSelectedBooking} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-3 text-center text-[12px] text-gray-300 bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
+                        No bookings scheduled
+                      </div>
                     )}
                   </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-      </AnimatePresence>
+                );
+              })}
+            </motion.div>
+          </AnimatePresence>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-20 text-sm text-gray-400">
-          No bookings for {format(currentDate, 'MMMM d, yyyy')}.
-        </div>
+          {filtered.length === 0 && (
+            <div className="text-center py-20 text-sm text-gray-400">
+              No bookings in the next 2 weeks.
+            </div>
+          )}
+        </>
       )}
 
       {/* Detail modal */}
