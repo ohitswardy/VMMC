@@ -194,7 +194,7 @@ const DESIGNATION_DEPT_MAP: Record<string, DepartmentId[]> = {
   'Ophtha': ['OPHTHA'],
   'Cardiac': ['CARDIAC', 'TCVS'],
   'Neurosurgery': ['NEURO'],
-  'Pediatrics Surgery': ['PEDIA'],
+  'Pediatric Surgery': ['PEDIA'],
   'Urology': ['URO'],
   'Plastics': ['PLASTICS'],
 };

@@ -43,7 +43,7 @@ export const MOCK_OR_ROOMS: ORRoom[] = [
   { id: 'r4', number: 4, name: 'OR 4', designation: 'ENT / Ophtha Priority', is_active: true, buffer_time_minutes: 30, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
   { id: 'r5', number: 5, name: 'OR 5', designation: 'Cardiac', is_active: true, buffer_time_minutes: 45, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
   { id: 'r6', number: 6, name: 'OR 6', designation: 'Neurosurgery Priority', is_active: true, buffer_time_minutes: 30, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-  { id: 'r7', number: 7, name: 'OR 7', designation: 'Pediatrics Surgery Priority', is_active: true, buffer_time_minutes: 30, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+  { id: 'r7', number: 7, name: 'OR 7', designation: 'Pediatric Surgery Priority', is_active: true, buffer_time_minutes: 30, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
   { id: 'r8', number: 8, name: 'OR 8', designation: 'Multi-specialty', is_active: true, buffer_time_minutes: 30, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
 ];
 

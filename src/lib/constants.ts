@@ -5,7 +5,7 @@ export const DEPARTMENTS = [
   { id: 'ORTHO', name: 'Orthopedics', color: '#f59e0b', bg: '#fffbeb' },
   { id: 'OPHTHA', name: 'Ophthalmology', color: '#8b5cf6', bg: '#f5f3ff' },
   { id: 'ENT', name: 'ENT', color: '#14b8a6', bg: '#f0fdfa' },
-  { id: 'PEDIA', name: 'Pediatrics Surgery', color: '#f97316', bg: '#fff7ed' },
+  { id: 'PEDIA', name: 'Pediatric Surgery', color: '#f97316', bg: '#fff7ed' },
   { id: 'URO', name: 'Urology', color: '#06b6d4', bg: '#ecfeff' },
   { id: 'TCVS', name: 'TCVS', color: '#dc2626', bg: '#fef2f2' },
   { id: 'NEURO', name: 'Neurosurgery', color: '#7c3aed', bg: '#f5f3ff' },
@@ -45,7 +45,7 @@ export const DEFAULT_OR_ROOMS = [
   { number: 4, name: 'OR 4', designation: 'ENT / Ophtha Priority' },
   { number: 5, name: 'OR 5', designation: 'Cardiac' },
   { number: 6, name: 'OR 6', designation: 'Neurosurgery Priority' },
-  { number: 7, name: 'OR 7', designation: 'Pediatrics Surgery Priority' },
+  { number: 7, name: 'OR 7', designation: 'Pediatric Surgery Priority' },
   { number: 8, name: 'OR 8', designation: 'Multi-specialty' },
 ] as const;
 

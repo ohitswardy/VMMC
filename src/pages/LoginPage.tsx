@@ -137,7 +137,7 @@ export default function LoginPage() {
                 { email: 'ortho@vmmc.gov.ph',       label: 'Orthopedics',     role: 'department_user' },
                 { email: 'ophtha@vmmc.gov.ph',      label: 'Ophthalmology',   role: 'department_user' },
                 { email: 'ent@vmmc.gov.ph',         label: 'ENT',             role: 'department_user' },
-                { email: 'pedia@vmmc.gov.ph',       label: 'Pediatrics Surgery', role: 'department_user' },
+                { email: 'pedia@vmmc.gov.ph',       label: 'Pediatric Surgery', role: 'department_user' },
                 { email: 'uro@vmmc.gov.ph',         label: 'Urology',         role: 'department_user' },
                 { email: 'tcvs@vmmc.gov.ph',        label: 'TCVS',            role: 'department_user' },
                 { email: 'neuro@vmmc.gov.ph',       label: 'Neurosurgery',    role: 'department_user' },
