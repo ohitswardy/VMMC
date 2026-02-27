@@ -10,6 +10,8 @@ import {
   subMonths, isSameMonth, isSameDay
 } from 'date-fns';
 import { useBookingsStore, useORRoomsStore, useORPriorityScheduleStore } from '../stores/appStore';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { OR_CALENDAR_HELP } from '../lib/helpContent';
 import { useAuthStore } from '../stores/authStore';
 import { getDeptColor, getDeptBg, getDeptName, formatTime, generateTimeSlots, getRoomPriorityForDay, getAllPrioritiesForDay, getWeekdayName } from '../lib/utils';
 import type { RoomPriorityInfo } from '../lib/utils';
@@ -127,31 +129,58 @@ export default function ORCalendarPage() {
   return (
     <div className="page-container">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="page-header">
-          <h1>OR Schedule</h1>
-          <p>Interactive operating room calendar</p>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-start gap-3">
+            <div className="page-header">
+              <h1>OR Schedule</h1>
+              <p>Interactive operating room calendar</p>
+            </div>
+            <PageHelpButton {...OR_CALENDAR_HELP} />
+          </div>
+          {/* Desktop action buttons */}
+          <div className="hidden sm:flex items-center gap-2">
+            {isAdmin && (
+              <Button variant="secondary" size="sm" icon={<Printer className="w-4 h-4" />}
+                onClick={handlePrintPDF}>
+                Print PDF
+              </Button>
+            )}
+            {isAdmin && (
+              <Button variant="danger" size="sm" icon={<AlertTriangle className="w-4 h-4" />}
+                onClick={() => { useBookingsStore.getState().setSelectedRoom(null); openForm(); }}>
+                Emergency
+              </Button>
+            )}
+            {canBook && (
+              <Button size="sm" icon={<Plus className="w-4 h-4" />}
+                onClick={() => { useBookingsStore.getState().setSelectedRoom(null); openForm(); }}>
+                New Booking
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        {/* Mobile action buttons — stacked below title */}
+        <div className="flex sm:hidden items-center gap-2">
           {isAdmin && (
-            <Button variant="secondary" size="sm" icon={<Printer className="w-4 h-4" />}
-              className="hidden sm:inline-flex"
+            <Button variant="secondary" size="lg" icon={<Printer className="w-5 h-5" />}
+              className="flex-1"
               onClick={handlePrintPDF}>
               Print PDF
             </Button>
           )}
           {isAdmin && (
-            <Button variant="danger" size="sm" icon={<AlertTriangle className="w-4 h-4" />}
-              className="hidden sm:inline-flex"
+            <Button variant="danger" size="lg" icon={<AlertTriangle className="w-5 h-5" />}
+              className="flex-1"
               onClick={() => { useBookingsStore.getState().setSelectedRoom(null); openForm(); }}>
               Emergency
             </Button>
           )}
           {canBook && (
-            <Button size="sm" icon={<Plus className="w-4 h-4" />}
+            <Button size="lg" icon={<Plus className="w-5 h-5" />}
+              className="flex-1"
               onClick={() => { useBookingsStore.getState().setSelectedRoom(null); openForm(); }}>
-              <span className="hidden sm:inline">New Booking</span>
-              <span className="sm:hidden">Book</span>
+              Book
             </Button>
           )}
         </div>

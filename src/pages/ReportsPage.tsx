@@ -11,6 +11,8 @@ import {
 } from 'recharts';
 import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { getDeptColor, getDeptName, calcUtilization } from '../lib/utils';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { REPORTS_HELP } from '../lib/helpContent';
 import type { DepartmentId } from '../lib/constants';
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444', '#84cc16'];
@@ -85,9 +87,12 @@ export default function ReportsPage() {
 
   return (
     <div className="page-container">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Reports</h1>
-        <p className="text-xs md:text-sm text-gray-500 mt-0.5">OR performance insights and statistics</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Reports</h1>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5">OR performance insights and statistics</p>
+        </div>
+        <PageHelpButton {...REPORTS_HELP} />
       </div>
 
       {/* ── UntitledUI-style Metric Cards ── */}

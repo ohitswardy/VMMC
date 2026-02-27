@@ -59,7 +59,12 @@ export async function generateSchedulePDF(
   }
 
   const headerCenterX = pageWidth / 2;
-  let headerY = 13;
+  let headerY = 11;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('VETERANS MEMORIAL MEDICAL CENTER', headerCenterX, headerY, { align: 'center' });
+  headerY += 5;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);

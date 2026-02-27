@@ -16,6 +16,8 @@ import { getDeptColor, getDeptBg, getDeptName, formatTime } from '../lib/utils';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
 import { CustomSelect } from '../components/ui/CustomSelect';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { DASHBOARD_HELP } from '../lib/helpContent';
 
 const fadeUp = {
   initial: { opacity: 0, y: 12 },
@@ -81,11 +83,14 @@ export default function DashboardPage() {
   return (
     <div className="page-container">
       {/* Header */}
-      <div className="page-header">
-        <h1>Dashboard</h1>
-        <p>
-          {isAdmin ? 'Anesthesiology admin overview' : `${getDeptName(user?.department_id as any)} department`}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="page-header">
+          <h1>Dashboard</h1>
+          <p>
+            {isAdmin ? 'Anesthesiology admin overview' : `${getDeptName(user?.department_id as any)} department`}
+          </p>
+        </div>
+        <PageHelpButton {...DASHBOARD_HELP} />
       </div>
 
       {/* ── UntitledUI-style Metric Cards ── */}

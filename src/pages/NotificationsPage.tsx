@@ -7,6 +7,8 @@ import { useNotificationsStore } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import Button from '../components/ui/Button';
 import { CustomSelect } from '../components/ui/CustomSelect';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { NOTIFICATIONS_HELP } from '../lib/helpContent';
 import type { Notification } from '../lib/types';
 
 /** Map a notification type → the app route the user should be taken to */
@@ -79,9 +81,12 @@ export default function NotificationsPage() {
   return (
     <div className="page-container">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5">{unread} unread notification{unread !== 1 ? 's' : ''}</p>
+        <div className="flex items-start gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Notifications</h1>
+            <p className="text-xs md:text-sm text-gray-500 mt-0.5">{unread} unread notification{unread !== 1 ? 's' : ''}</p>
+          </div>
+          <PageHelpButton {...NOTIFICATIONS_HELP} />
         </div>
         <div className="flex gap-2">
           <CustomSelect

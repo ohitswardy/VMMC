@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Clock, Archive, Bell, Save } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { Input } from '../components/ui/FormFields';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { SETTINGS_HELP } from '../lib/helpContent';
 import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
@@ -18,9 +20,12 @@ export default function SettingsPage() {
 
   return (
     <div className="page-container max-w-3xl">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-xs md:text-sm text-gray-500 mt-0.5">System configuration and policies</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Settings</h1>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5">System configuration and policies</p>
+        </div>
+        <PageHelpButton {...SETTINGS_HELP} />
       </div>
 
       {/* Buffer Time */}

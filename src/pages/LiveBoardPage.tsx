@@ -10,6 +10,8 @@ import { auditRoomStatusChange } from '../lib/auditHelper';
 import type { ORRoomStatus } from '../lib/constants';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { LIVE_BOARD_HELP } from '../lib/helpContent';
 
 const fadeUp = {
   initial: { opacity: 0, y: 10 },
@@ -86,12 +88,15 @@ export default function LiveBoardPage() {
     <div className="page-container">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div className="page-header">
-          <h1>Live Board</h1>
+        <div className="flex items-start gap-3">
+          <div className="page-header">
+            <h1>Live Board</h1>
           <p>
             <span className="md:hidden">{format(new Date(), 'EEE, MMM d')}</span>
             <span className="hidden md:inline">Real-time status — {format(new Date(), 'EEEE, MMMM d, yyyy')}</span>
           </p>
+          </div>
+          <PageHelpButton {...LIVE_BOARD_HELP} />
         </div>
         <div className="flex items-center gap-3 text-[11px] md:text-xs flex-shrink-0 flex-wrap">
           <span className="flex items-center gap-1.5 text-blue-600">

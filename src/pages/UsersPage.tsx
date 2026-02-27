@@ -11,6 +11,8 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { Input } from '../components/ui/FormFields';
 import { CustomSelect } from '../components/ui/CustomSelect';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { USERS_HELP } from '../lib/helpContent';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -142,9 +144,12 @@ export default function UsersPage() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Users</h1>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5">Manage system users and roles</p>
+        <div className="flex items-start gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Users</h1>
+            <p className="text-xs md:text-sm text-gray-500 mt-0.5">Manage system users and roles</p>
+          </div>
+          <PageHelpButton {...USERS_HELP} />
         </div>
       </div>
 

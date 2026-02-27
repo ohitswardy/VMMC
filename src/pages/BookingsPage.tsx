@@ -15,6 +15,8 @@ import { CustomSelect } from '../components/ui/CustomSelect';
 import { useBookingsStore } from '../stores/appStore';
 import BookingDetailModal from '../components/booking/BookingDetailModal';
 import ChangeScheduleModal from '../components/booking/ChangeScheduleModal';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { BOOKINGS_HELP } from '../lib/helpContent';
 import type { Booking, ORRoom } from '../lib/types';
 
 const fadeUp = {
@@ -342,11 +344,14 @@ export default function BookingsPage() {
     <div className="page-container">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div className="page-header mb-0">
-          <h1>Bookings</h1>
-          <p>
-            {isAdmin ? 'All department bookings' : `${getDeptName(user?.department_id as any)} bookings`}
-          </p>
+        <div className="flex items-start gap-3">
+          <div className="page-header mb-0">
+            <h1>Bookings</h1>
+            <p>
+              {isAdmin ? 'All department bookings' : `${getDeptName(user?.department_id as any)} bookings`}
+            </p>
+          </div>
+          <PageHelpButton {...BOOKINGS_HELP} />
         </div>
 
         {/* Daily pagination navigator */}

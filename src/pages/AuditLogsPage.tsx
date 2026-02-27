@@ -4,6 +4,8 @@ import { Shield, Search } from 'lucide-react';
 import { DatePicker } from '../components/ui/DatePicker';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import { useAuditLogsStore } from '../stores/appStore';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { AUDIT_LOGS_HELP } from '../lib/helpContent';
 
 export default function AuditLogsPage() {
   const { logs } = useAuditLogsStore();
@@ -53,9 +55,12 @@ export default function AuditLogsPage() {
     <div className="page-container">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Audit Trail</h1>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5">Immutable record of all system actions</p>
+        <div className="flex items-start gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Audit Trail</h1>
+            <p className="text-xs md:text-sm text-gray-500 mt-0.5">Immutable record of all system actions</p>
+          </div>
+          <PageHelpButton {...AUDIT_LOGS_HELP} />
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-[8px] bg-amber-50 border border-amber-200 self-start">
           <Shield className="w-4 h-4 text-amber-600" />

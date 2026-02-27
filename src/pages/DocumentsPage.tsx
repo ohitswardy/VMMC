@@ -7,6 +7,8 @@ import { getDeptName, getDeptColor, formatTime } from '../lib/utils';
 import { generateSchedulePDF } from '../lib/generateSchedulePDF';
 import Button from '../components/ui/Button';
 import { DatePicker } from '../components/ui/DatePicker';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { DOCUMENTS_HELP } from '../lib/helpContent';
 
 export default function DocumentsPage() {
   const { bookings } = useBookingsStore();
@@ -37,9 +39,12 @@ export default function DocumentsPage() {
   return (
     <div className="page-container">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Documents</h1>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5">Download OR schedule sheets</p>
+        <div className="flex items-start gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Documents</h1>
+            <p className="text-xs md:text-sm text-gray-500 mt-0.5">Download OR schedule sheets</p>
+          </div>
+          <PageHelpButton {...DOCUMENTS_HELP} />
         </div>
       </div>
 

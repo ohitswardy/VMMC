@@ -9,6 +9,8 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { Input } from '../components/ui/FormFields';
 import ORPriorityModal from '../components/booking/ORPriorityModal';
+import PageHelpButton from '../components/ui/PageHelpButton';
+import { OR_ROOMS_HELP } from '../lib/helpContent';
 import type { ORRoom } from '../lib/types';
 import { format } from 'date-fns';
 
@@ -125,11 +127,14 @@ export default function ORRoomsPage() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">OR Rooms</h1>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5">
-            {isNurse ? 'Assign nurses on duty to each OR room' : 'Configure and manage operating rooms'}
-          </p>
+        <div className="flex items-start gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">OR Rooms</h1>
+            <p className="text-xs md:text-sm text-gray-500 mt-0.5">
+              {isNurse ? 'Assign nurses on duty to each OR room' : 'Configure and manage operating rooms'}
+            </p>
+          </div>
+          <PageHelpButton {...OR_ROOMS_HELP} />
         </div>
         {isAdmin && (
           <Button
