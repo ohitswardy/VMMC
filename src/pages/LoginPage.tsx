@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
-import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -27,83 +26,106 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-gray-50">
-      {/* Main — slightly off-center for asymmetry */}
-      <div className="flex-1 flex items-center justify-center px-4 pb-12">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-          className="w-full max-w-[400px]"
-        >
-          {/* Logo + Branding */}
-          <div className="flex flex-col items-center mb-8">
+    <div className="flex flex-col lg:flex-row min-h-[100dvh] bg-white">
+      {/* ─── Left side (scrollable) ─── */}
+      <div className="w-full lg:w-[48%] xl:w-[44%] overflow-y-auto">
+        <div className="flex flex-col min-h-[100dvh] px-8 sm:px-12 md:px-16 lg:px-20 py-10">
+          {/* Top: logo + title */}
+          <div className="mb-12">
             <img
               src="/VMMClogo.png"
               alt="VMMC"
-              className="h-24 w-auto object-contain mb-3"
+              className="h-20 w-20 object-contain mb-6"
             />
-            <span className="text-[15px] font-bold text-gray-900 tracking-tight">VMMC OR</span>
-          </div>
-
-          {/* Header — left-aligned */}
-          <div className="mb-8">
-            <h1 className="text-2xl md:text-[28px] font-bold text-gray-900 tracking-tight leading-tight">
-              Sign in
+            <h1 className="text-[28px] font-bold text-gray-900 leading-tight tracking-tight">
+              VMMC OR
+              <br />
+              Booking System
             </h1>
-            <p className="text-[15px] text-gray-500 mt-1.5">
-              Operating Room Scheduling System
-            </p>
           </div>
 
-          {/* Form Card */}
-          <div className="bg-white rounded-[12px] border border-gray-200 p-5 md:p-6 shadow-xs">
+          {/* Center: form */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+            className="w-full max-w-[360px]"
+          >
             <form onSubmit={handleLogin} className="space-y-5">
+              {/* Email */}
               <div className="space-y-1.5">
-                <label className="block text-[13px] font-medium text-gray-700">Email address</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@vmmc.gov.ph"
-                    className="input-base !pl-10"
-                    required
-                  />
-                </div>
+                <label className="block text-[13px] font-medium text-gray-700">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Example@email.com"
+                  className="w-full h-11 px-4 rounded-full border border-gray-200 bg-gray-50 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-100 transition-all"
+                  required
+                />
               </div>
 
+              {/* Password */}
               <div className="space-y-1.5">
                 <label className="block text-[13px] font-medium text-gray-700">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    className="input-base !pl-10 !pr-10"
+                    placeholder="At least 8 characters"
+                    className="w-full h-11 px-4 pr-11 rounded-full border border-gray-200 bg-gray-50 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-100 transition-all"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
-              <Button type="submit" loading={isLoading} fullWidth size="lg">
-                Sign in
-              </Button>
-            </form>
-          </div>
+              {/* Forgot password link */}
+              <div className="text-right">
+                <button type="button" className="text-[13px] font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                  Forgot Password?
+                </button>
+              </div>
 
-          {/* Quick login for demo */}
-          <div className="mt-8">
+              {/* Sign in button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-12 rounded-full bg-gray-900 text-white text-[15px] font-semibold
+                  hover:bg-gray-800 active:bg-black disabled:opacity-60 transition-colors"
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Signing in…
+                  </span>
+                ) : (
+                  'Sign in'
+                )}
+              </button>
+            </form>
+          </motion.div>
+
+          {/* Spacer to push copyright + demos to bottom */}
+          <div className="flex-1 min-h-12" />
+
+          {/* Copyright */}
+          <p className="text-[12px] text-gray-400 mt-8 mb-6">
+            © {new Date().getFullYear()} ALL RIGHTS RESERVED
+          </p>
+
+          {/* Demo accounts — below copyright */}
+          <div className="w-full max-w-[360px] pb-4">
             <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Demo accounts</p>
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -131,6 +153,22 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ─── Right side: hero image (sticky full-height) ─── */}
+      <div className="hidden lg:flex flex-1 items-center justify-center p-8 sticky top-0 h-[100dvh]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1], delay: 0.1 }}
+          className="w-full h-full max-h-[calc(100dvh-64px)] rounded-2xl overflow-hidden shadow-2xl shadow-gray-300/40"
+        >
+          <img
+            src="/VMMC.jpg"
+            alt="VMMC Building"
+            className="w-full h-full object-cover"
+          />
         </motion.div>
       </div>
     </div>

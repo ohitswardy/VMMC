@@ -1,4 +1,4 @@
-import { format, parseISO, differenceInMinutes, addMinutes, isWithinInterval, isBefore, addHours } from 'date-fns';
+import { format, parseISO, differenceInMinutes, addMinutes, isWithinInterval, isBefore, addHours, addDays, startOfDay } from 'date-fns';
 import type { Booking, ORRoom } from './types';
 import { DEPARTMENT_MAP, DEPARTMENTS, type DepartmentId } from './constants';
 
@@ -88,10 +88,53 @@ export function canModifyBooking(booking: Booking): boolean {
   return isBefore(cutoff, bookingDateTime);
 }
 
-/** Generate time slots for a day (7 AM to 7 PM, 30-min intervals) */
-export function generateTimeSlots(intervalMinutes = 30): string[] {
+/**
+ * Check if the booking deadline has passed for a given target date.
+ * Rule: bookings must be submitted by 12:00 PM on the previous business day.
+ * - For Tuesday–Friday bookings → deadline is previous day at 12:00 PM
+ * - For Monday bookings → deadline is Friday at 12:00 PM
+ * Returns null if still within deadline, or a description object if past deadline.
+ */
+export function getBookingDeadlineStatus(targetDateStr: string): {
+  isPastDeadline: boolean;
+  deadlineLabel: string;
+} {
+  const now = new Date();
+  const target = parseISO(targetDateStr);
+  const targetDay = startOfDay(target);
+  const dow = target.getDay(); // 0=Sun … 6=Sat
+
+  // Calculate the previous business day
+  let prevBusinessDay: Date;
+  if (dow === 1) {
+    // Monday → previous Friday (3 days back)
+    prevBusinessDay = addDays(targetDay, -3);
+  } else if (dow === 0) {
+    // Sunday → previous Friday (2 days back) — weekends are blocked separately
+    prevBusinessDay = addDays(targetDay, -2);
+  } else {
+    // Tue–Sat → previous day
+    prevBusinessDay = addDays(targetDay, -1);
+  }
+
+  // Deadline is 12:00 PM (noon) on that previous business day
+  const deadline = new Date(prevBusinessDay);
+  deadline.setHours(12, 0, 0, 0);
+
+  const deadlineLabel = dow === 1
+    ? `Friday ${format(prevBusinessDay, 'MMM dd')} at 12:00 PM`
+    : `${format(prevBusinessDay, 'EEEE, MMM dd')} at 12:00 PM`;
+
+  return {
+    isPastDeadline: now >= deadline,
+    deadlineLabel,
+  };
+}
+
+/** Generate time slots for a day (full 24 hours, 30-min intervals by default) */
+export function generateTimeSlots(intervalMinutes = 30, startHour = 0, endHour = 24): string[] {
   const slots: string[] = [];
-  for (let h = 7; h < 19; h++) {
+  for (let h = startHour; h < endHour; h++) {
     for (let m = 0; m < 60; m += intervalMinutes) {
       slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }

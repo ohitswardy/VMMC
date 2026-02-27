@@ -14,7 +14,7 @@ import {
   DEPARTMENTS, PATIENT_CATEGORIES, ANES_DEPARTMENT_CONTACT,
   type DepartmentId
 } from '../../lib/constants';
-import { hasRoomConflict, hasAnesthesiologistConflict, timeRangesOverlap, formatTime } from '../../lib/utils';
+import { hasRoomConflict, hasAnesthesiologistConflict, timeRangesOverlap, formatTime, getBookingDeadlineStatus } from '../../lib/utils';
 import {
   auditBookingCreate,
   auditBookingUpdate,
@@ -171,9 +171,24 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       return { type: 'weekend' as const, title: 'Weekend Booking Not Available', message: 'Elective cases are only available Monday through Friday. Please select a weekday or contact the Department of Anesthesiology for assistance.' };
     }
-    if (selectedDay.getTime() === today.getTime() && now.getHours() >= 12) {
-      return { type: 'noon' as const, title: 'Same-Day Booking Restricted (Past 12:00 PM)', message: 'Elective bookings for today cannot be submitted after 12:00 PM. Please contact the Department of Anesthesiology for urgent scheduling.' };
+
+    // Deadline rule: bookings must be submitted by 12:00 PM on the previous business day.
+    // For Monday bookings → deadline is Friday 12:00 PM.
+    // For Tue–Fri bookings → deadline is the previous day at 12:00 PM.
+    const { isPastDeadline, deadlineLabel } = getBookingDeadlineStatus(form.date);
+    if (isPastDeadline) {
+      const isSameDay = selectedDay.getTime() === today.getTime();
+      const title = isSameDay
+        ? 'Same-Day Booking Closed'
+        : dayOfWeek === 1
+          ? 'Monday Booking Deadline Passed (Friday 12:00 PM)'
+          : 'Next-Day Booking Deadline Passed (12:00 PM)';
+      const message = isSameDay
+        ? `Same-day elective bookings are no longer accepted. The OR schedule was finalized the previous business day at 12:00 PM. Please contact the Department of Anesthesiology for urgent scheduling.`
+        : `Elective bookings for ${format(selected, 'EEEE, MMM dd')} must be submitted by ${deadlineLabel}. The final OR schedule has already been printed. Please contact the Department of Anesthesiology for urgent scheduling.`;
+      return { type: 'deadline' as const, title, message };
     }
+
     if (isAfter(selectedDay, maxDate)) {
       return { type: 'max_date' as const, title: 'Maximum Booking Range Exceeded', message: 'Elective bookings can only be made up to 2 weeks (14 days) in advance. Please select an earlier date.' };
     }
@@ -484,7 +499,7 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
               <p className="text-sm font-bold text-red-700">{bookingRestriction.title}</p>
             </div>
             <p className="text-sm text-red-600">{bookingRestriction.message}</p>
-            {(bookingRestriction.type === 'weekend' || bookingRestriction.type === 'noon') && (
+            {(bookingRestriction.type === 'weekend' || bookingRestriction.type === 'deadline') && (
               <div className="p-3 rounded-[8px] bg-white border border-red-100">
                 <p className="text-sm font-semibold text-gray-800">📞 Contact {ANES_DEPARTMENT_CONTACT.name}</p>
               </div>

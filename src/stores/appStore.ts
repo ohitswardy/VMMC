@@ -6,7 +6,7 @@ import {
   fetchBookings, createBooking, updateBookingDB,
   fetchORRooms, createORRoom, updateORRoom, deleteORRoom,
   fetchLiveStatuses, upsertLiveStatus,
-  fetchNotifications, markNotificationRead, markAllNotificationsRead,
+  fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification,
   fetchAuditLogs,
   fetchChangeRequests, createChangeRequest, updateChangeRequest,
   fetchPrioritySchedule, upsertPriorityCell, deletePriorityCell,
@@ -176,6 +176,7 @@ interface NotificationsState {
   addNotification: (notification: Notification) => void;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: (userId: string) => Promise<void>;
+  removeNotification: (id: string) => Promise<void>;
 }
 
 export const useNotificationsStore = create<NotificationsState>((set) => ({
@@ -221,6 +222,17 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
       unreadCount: 0,
     }));
     await markAllNotificationsRead(userId);
+  },
+
+  removeNotification: async (id) => {
+    set((s) => {
+      const target = s.notifications.find((n) => n.id === id);
+      return {
+        notifications: s.notifications.filter((n) => n.id !== id),
+        unreadCount: target && !target.is_read ? Math.max(0, s.unreadCount - 1) : s.unreadCount,
+      };
+    });
+    await deleteNotification(id);
   },
 }));
 

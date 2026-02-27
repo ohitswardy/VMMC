@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useCallback, useEffect } from 'react';
+﻿import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Plus, AlertTriangle,
@@ -642,14 +642,30 @@ function DayView({
   const weekday = getWeekdayName(date);
   const dayPriorities = getAllPrioritiesForDay(schedule, weekday);
 
+  // Slot constants — keep in sync with the h-14 (56 px) row used in the desktop grid
+  const SLOT_PX = 56;    // px per 30-min slot on desktop
+  const SLOT_PX_MOB = 52; // px per 30-min slot on mobile (min-h-[52px])
+  const TOTAL_MINUTES = 24 * 60; // full day
+
+  const desktopRef = useRef<HTMLDivElement>(null);
+  const mobileRef  = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to 7 AM whenever the viewed date changes
+  useEffect(() => {
+    const offset7am = 7 * 2 * SLOT_PX;      // 7 h × 2 slots/h × 56 px
+    const offset7amMob = 7 * 2 * SLOT_PX_MOB;
+    if (desktopRef.current) desktopRef.current.scrollTop = offset7am;
+    if (mobileRef.current)  mobileRef.current.scrollTop  = offset7amMob;
+  }, [date]);
+
   const getBookingStyle = (booking: Booking) => {
     const [sh, sm] = booking.start_time.split(':').map(Number);
     const [eh, em] = booking.end_time.split(':').map(Number);
-    const startMin = (sh - 7) * 60 + sm;
-    const endMin = (eh - 7) * 60 + em;
-    const top = (startMin / (12 * 60)) * 100;
-    const height = ((endMin - startMin) / (12 * 60)) * 100;
-    return { top: `${top}%`, height: `${Math.max(height, 3)}%` };
+    const startMin = sh * 60 + sm;           // offset from midnight
+    const endMin   = eh * 60 + em;
+    const top    = (startMin / TOTAL_MINUTES) * 100;
+    const height = ((endMin - startMin) / TOTAL_MINUTES) * 100;
+    return { top: `${top}%`, height: `${Math.max(height, 1.5)}%` };
   };
 
   return (
@@ -693,7 +709,7 @@ function DayView({
           );
         })()}
 
-        <div className="relative">
+        <div ref={mobileRef} className="relative overflow-y-auto max-h-[calc(100svh-260px)]">
           {timeSlots.map(slot => (
             <div
               key={slot}
@@ -777,13 +793,20 @@ function DayView({
         </div>
 
         <div
+          ref={desktopRef}
+          className="relative overflow-y-auto max-h-[calc(100svh-300px)]"
+        >
+        <div
           className="relative grid"
           style={{ gridTemplateColumns: `72px repeat(${rooms.length}, 1fr)` }}
         >
           <div className="border-r border-gray-100">
-            {timeSlots.map(slot => (
+            {timeSlots.map((slot, idx) => (
               <div key={slot} className="h-14 px-3 flex items-start pt-1 border-b border-gray-50">
-                <span className="text-[10px] text-gray-400 font-medium tabular-nums">{formatTime(slot)}</span>
+                {/* Bold label on every whole hour, faint label on half-hour */}
+                <span className={`text-[10px] font-medium tabular-nums ${
+                  idx % 2 === 0 ? 'text-gray-500' : 'text-gray-300'
+                }`}>{idx % 2 === 0 ? formatTime(slot) : '·'}</span>
               </div>
             ))}
           </div>
@@ -840,6 +863,7 @@ function DayView({
             );
           })}
         </div>
+        </div> {/* end scrollable wrapper */}
       </div>
     </>
   );

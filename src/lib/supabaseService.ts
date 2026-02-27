@@ -232,6 +232,11 @@ export async function insertNotification(notification: Omit<Notification, 'id' |
   if (error) throw error;
 }
 
+export async function deleteNotification(id: string): Promise<void> {
+  const { error } = await supabase.from('notifications').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // ═════════════════════════════════════════════
 // AUDIT LOGS
 // ═════════════════════════════════════════════
