@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
-import { Bell, CheckCheck, X, Trash2 } from 'lucide-react';
+import { Bell, CheckCheck, X, Trash2, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationsStore } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -55,6 +55,8 @@ export default function NotificationsPage() {
   const { notifications, markAsRead, markAllAsRead, removeNotification } = useNotificationsStore();
   const navigate = useNavigate();
   const [filterType, setFilterType] = useState('all');
+  const PAGE_SIZE = 10;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const unread = notifications.filter((n) => !n.is_read).length;
 
@@ -63,6 +65,21 @@ export default function NotificationsPage() {
     if (filterType === 'unread') return notifications.filter((n) => !n.is_read);
     return notifications.filter((n) => n.type === filterType);
   }, [notifications, filterType]);
+
+  // Slice the filtered list for pagination
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const hasMore = visibleCount < filtered.length;
+  const remaining = filtered.length - visibleCount;
+
+  // Reset visible count when filter changes
+  const handleFilterChange = useCallback((val: string) => {
+    setFilterType(val);
+    setVisibleCount(PAGE_SIZE);
+  }, []);
+
+  const handleShowMore = useCallback(() => {
+    setVisibleCount((prev) => prev + PAGE_SIZE);
+  }, []);
 
   const handleMarkAllRead = () => {
     if (user) markAllAsRead(user.id);
@@ -91,7 +108,7 @@ export default function NotificationsPage() {
         <div className="flex gap-2">
           <CustomSelect
             value={filterType}
-            onChange={(val) => setFilterType(val)}
+            onChange={handleFilterChange}
             options={[
               { value: 'all', label: 'All' },
               { value: 'unread', label: 'Unread' },
@@ -116,7 +133,7 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <AnimatePresence initial={false}>
-            {filtered.map((n, i) => (
+            {visible.map((n, i) => (
               <SwipeableNotificationRow
                 key={n.id}
                 n={n}
@@ -129,6 +146,32 @@ export default function NotificationsPage() {
           </AnimatePresence>
         )}
       </div>
+
+      {/* "See Previous Notifications" pagination button */}
+      {hasMore && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="flex justify-center mt-4"
+        >
+          <button
+            onClick={handleShowMore}
+            className="group inline-flex items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-gray-500 bg-white border border-gray-200 rounded-[10px] hover:border-gray-300 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-all duration-150"
+          >
+            <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-500 transition-colors" />
+            See Previous Notifications
+            <span className="text-[11px] text-gray-400 ml-0.5">({remaining > PAGE_SIZE ? PAGE_SIZE : remaining} more)</span>
+          </button>
+        </motion.div>
+      )}
+
+      {/* "Showing x of y" indicator */}
+      {filtered.length > 0 && (
+        <p className="text-center text-[11px] text-gray-400 mt-2">
+          Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} notification{filtered.length !== 1 ? 's' : ''}
+        </p>
+      )}
     </div>
   );
 }
