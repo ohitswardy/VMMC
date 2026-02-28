@@ -21,8 +21,9 @@ import {
   useORPriorityScheduleStore,
   useAuditLogsStore,
 } from './stores/appStore';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
+import { sendUpcomingReminders, sendPurgeWarnings } from './lib/notificationHelper';
 import type { Notification } from './lib/types';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
@@ -35,10 +36,14 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 export default function App() {
   const { isAuthenticated, user, initAuth, isLoading: authLoading } = useAuthStore();
   const { loadNotifications, addNotification } = useNotificationsStore();
-  const { loadBookings } = useBookingsStore();
+  const { loadBookings, bookings } = useBookingsStore();
   const { loadRooms, loadLiveStatuses } = useORRoomsStore();
   const { loadSchedule } = useORPriorityScheduleStore();
   const { loadLogs } = useAuditLogsStore();
+
+  // Refs for tracking already-sent reminders / purge warnings (persists across interval ticks)
+  const sentReminderRef = useRef(new Set<string>());
+  const sentPurgeRef = useRef(new Set<string>());
 
   // Initialize Supabase auth session on first load
   useEffect(() => {
@@ -86,6 +91,26 @@ export default function App() {
       supabase.removeChannel(channel);
     };
   }, [isAuthenticated, user, addNotification]);
+
+  // ── Periodic reminder & purge-warning scheduler ──
+  // Runs every 5 minutes for admins, checks bookings for 24h/2h reminders and purge warnings
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const isAdminUser = user.role === 'super_admin' || user.role === 'anesthesiology_admin';
+    if (!isAdminUser) return; // Only admin sessions run the scheduler to avoid duplicate notifications
+
+    const runChecks = async () => {
+      if (bookings.length === 0) return;
+      sentReminderRef.current = await sendUpcomingReminders(bookings, sentReminderRef.current);
+      sentPurgeRef.current = await sendPurgeWarnings(bookings, sentPurgeRef.current);
+    };
+
+    // Run once immediately, then every 5 minutes
+    runChecks();
+    const interval = setInterval(runChecks, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user, bookings]);
 
   return (
     <BrowserRouter>

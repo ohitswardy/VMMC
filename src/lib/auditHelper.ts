@@ -94,6 +94,10 @@ export function auditChangeRequestSubmit(userId: string, bookingId: string, chan
   return log(userId, 'change_request.submit', 'booking', bookingId, undefined, changes);
 }
 
+export function auditChangeRequestReview(userId: string, requestId: string, bookingId: string, decision: 'approved' | 'denied', reason?: string) {
+  return log(userId, `change_request.${decision}`, 'booking', bookingId, { request_id: requestId }, { decision, reason });
+}
+
 // ══════════════════════════════════════════════
 // OR ROOMS / LIVE STATUS
 // ══════════════════════════════════════════════

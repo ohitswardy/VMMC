@@ -306,9 +306,15 @@ export async function notifyRoomStatusChange(
       .map((p) => p.id);
 
     // Only notify on significant status changes
-    if (newStatus === 'ongoing' || newStatus === 'ended' || newStatus === 'deferred') {
+    if (newStatus === 'ongoing' || newStatus === 'ended' || newStatus === 'deferred' || newStatus === 'in_transit') {
+      const statusLabel =
+        newStatus === 'ongoing' ? 'Case Started' :
+        newStatus === 'ended' ? 'Case Ended' :
+        newStatus === 'in_transit' ? 'Patient In Transit' :
+        'Case Deferred';
+
       await notifyUsers(targetIds, {
-        title: `${roomName} — ${newStatus === 'ongoing' ? 'Case Started' : newStatus === 'ended' ? 'Case Ended' : 'Case Deferred'}`,
+        title: `${roomName} — ${statusLabel}`,
         message: `${roomName} status changed to "${newStatus}" by ${changedByName}.`,
         type: newStatus === 'deferred' ? 'emergency_alert' : 'case_ending_soon',
         is_read: false,
@@ -317,4 +323,206 @@ export async function notifyRoomStatusChange(
   } catch (err) {
     console.error('notifyRoomStatusChange failed:', err);
   }
+}
+
+/**
+ * Notify a department when an admin books on their behalf (delegation).
+ */
+export async function notifyAdminDelegatedBooking(
+  booking: Booking,
+  adminName: string,
+  targetDepartmentId: DepartmentId
+) {
+  try {
+    const deptUsers = await getDepartmentUsers(targetDepartmentId);
+    const deptUserIds = deptUsers.map((u) => u.id);
+    if (deptUserIds.length === 0) return;
+
+    await notifyUsers(deptUserIds, {
+      title: 'Booking Created on Your Behalf',
+      message: `${adminName} has created a booking for "${booking.procedure}" (${booking.patient_name}) on ${booking.date} ${formatTime(booking.start_time)} – ${formatTime(booking.end_time)} on behalf of ${getDeptName(targetDepartmentId)}.`,
+      type: 'new_request',
+      related_booking_id: booking.id,
+      is_read: false,
+    });
+  } catch (err) {
+    console.error('notifyAdminDelegatedBooking failed:', err);
+  }
+}
+
+/**
+ * Notify the change-request creator when their request is approved.
+ */
+export async function notifyChangeRequestApproved(
+  booking: Booking,
+  requestedBy: string,
+  reviewedByName: string,
+  newDate: string,
+  newTime: string
+) {
+  try {
+    const targetIds = new Set<string>();
+    if (requestedBy) targetIds.add(requestedBy);
+
+    const deptUsers = await getDepartmentUsers(booking.department_id);
+    deptUsers.forEach((u) => targetIds.add(u.id));
+
+    await notifyUsers([...targetIds], {
+      title: 'Schedule Change Approved',
+      message: `Your change request for "${booking.procedure}" (${booking.patient_name}) has been approved by ${reviewedByName}. New schedule: ${newDate} ${formatTime(newTime)}.`,
+      type: 'approval',
+      related_booking_id: booking.id,
+      is_read: false,
+    });
+  } catch (err) {
+    console.error('notifyChangeRequestApproved failed:', err);
+  }
+}
+
+/**
+ * Notify the change-request creator when their request is denied.
+ */
+export async function notifyChangeRequestDenied(
+  booking: Booking,
+  requestedBy: string,
+  reviewedByName: string,
+  reason: string
+) {
+  try {
+    const targetIds = new Set<string>();
+    if (requestedBy) targetIds.add(requestedBy);
+
+    const deptUsers = await getDepartmentUsers(booking.department_id);
+    deptUsers.forEach((u) => targetIds.add(u.id));
+
+    await notifyUsers([...targetIds], {
+      title: 'Schedule Change Denied',
+      message: `Your change request for "${booking.procedure}" (${booking.patient_name}) has been denied by ${reviewedByName}. Reason: ${reason}`,
+      type: 'denial',
+      related_booking_id: booking.id,
+      is_read: false,
+    });
+  } catch (err) {
+    console.error('notifyChangeRequestDenied failed:', err);
+  }
+}
+
+/**
+ * Send 24-hour or 2-hour reminder notifications for upcoming approved bookings.
+ * Call this periodically (e.g., from a useEffect interval in App.tsx).
+ */
+export async function sendUpcomingReminders(
+  bookings: Booking[],
+  sentReminderIds: Set<string>
+): Promise<Set<string>> {
+  const now = new Date();
+  const newSentIds = new Set(sentReminderIds);
+
+  for (const booking of bookings) {
+    if (booking.status !== 'approved') continue;
+
+    const bookingDateTime = new Date(`${booking.date}T${booking.start_time}`);
+    const hoursUntil = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    // Skip past bookings
+    if (hoursUntil < 0) continue;
+
+    const key24 = `24h-${booking.id}`;
+    const key2 = `2h-${booking.id}`;
+
+    // 24-hour reminder: send when 24–23 hours away
+    if (hoursUntil <= 24 && hoursUntil > 23 && !newSentIds.has(key24)) {
+      try {
+        const targetIds = new Set<string>();
+        if (booking.created_by) targetIds.add(booking.created_by);
+        const deptUsers = await getDepartmentUsers(booking.department_id);
+        deptUsers.forEach((u) => targetIds.add(u.id));
+
+        await notifyUsers([...targetIds], {
+          title: 'Reminder: Surgery Tomorrow',
+          message: `Reminder: "${booking.procedure}" for ${booking.patient_name} is scheduled tomorrow at ${formatTime(booking.start_time)}. Please ensure all preparations are complete.`,
+          type: 'reminder_24h',
+          related_booking_id: booking.id,
+          is_read: false,
+        });
+        newSentIds.add(key24);
+      } catch (err) {
+        console.error(`reminder_24h failed for booking ${booking.id}:`, err);
+      }
+    }
+
+    // 2-hour reminder: send when 2–1 hours away
+    if (hoursUntil <= 2 && hoursUntil > 1 && !newSentIds.has(key2)) {
+      try {
+        const targetIds = new Set<string>();
+        if (booking.created_by) targetIds.add(booking.created_by);
+        const deptUsers = await getDepartmentUsers(booking.department_id);
+        deptUsers.forEach((u) => targetIds.add(u.id));
+
+        // Also notify admins/nurses for the 2-hour reminder
+        const admins = await getAdminUsers();
+        admins.forEach((a) => targetIds.add(a.id));
+
+        await notifyUsers([...targetIds], {
+          title: 'Reminder: Surgery in 2 Hours',
+          message: `Reminder: "${booking.procedure}" for ${booking.patient_name} starts at ${formatTime(booking.start_time)} today. Final preparations should be underway.`,
+          type: 'reminder_2h',
+          related_booking_id: booking.id,
+          is_read: false,
+        });
+        newSentIds.add(key2);
+      } catch (err) {
+        console.error(`reminder_2h failed for booking ${booking.id}:`, err);
+      }
+    }
+  }
+
+  return newSentIds;
+}
+
+/**
+ * Send purge-warning notifications for completed/cancelled bookings approaching retention limit.
+ * Uses a default 7-day retention and 48-hour warning window.
+ */
+export async function sendPurgeWarnings(
+  bookings: Booking[],
+  sentPurgeIds: Set<string>,
+  retentionDays: number = 7,
+  warningHours: number = 48
+): Promise<Set<string>> {
+  const now = new Date();
+  const newSentIds = new Set(sentPurgeIds);
+
+  for (const booking of bookings) {
+    if (booking.status !== 'completed' && booking.status !== 'cancelled') continue;
+
+    const key = `purge-${booking.id}`;
+    if (newSentIds.has(key)) continue;
+
+    // Calculate purge date = booking.updated_at + retentionDays
+    const updatedAt = new Date(booking.updated_at);
+    const purgeDate = new Date(updatedAt.getTime() + retentionDays * 24 * 60 * 60 * 1000);
+    const hoursUntilPurge = (purgeDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    // Send warning when within the warning window
+    if (hoursUntilPurge > 0 && hoursUntilPurge <= warningHours) {
+      try {
+        const admins = await getAdminUsers();
+        const adminIds = admins.map((a) => a.id);
+
+        await notifyUsers(adminIds, {
+          title: 'Data Purge Warning',
+          message: `Booking "${booking.procedure}" for ${booking.patient_name} (${booking.date}) will be purged in approximately ${Math.round(hoursUntilPurge)} hours. Download or archive if needed.`,
+          type: 'purge_warning',
+          related_booking_id: booking.id,
+          is_read: false,
+        });
+        newSentIds.add(key);
+      } catch (err) {
+        console.error(`purge_warning failed for booking ${booking.id}:`, err);
+      }
+    }
+  }
+
+  return newSentIds;
 }

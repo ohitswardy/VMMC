@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Clock, User, Stethoscope, AlertCircle } from 'lucide-react';
+import { Activity, Clock, User, Stethoscope, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { getDeptColor, getDeptName, formatTime, getRoomStatusInfo } from '../lib/utils';
 import { useAuthStore } from '../stores/authStore';
-import { notifyRoomStatusChange } from '../lib/notificationHelper';
+import { notifyRoomStatusChange, notifyBookingCancelled } from '../lib/notificationHelper';
 import { auditRoomStatusChange } from '../lib/auditHelper';
 import type { ORRoomStatus } from '../lib/constants';
+import type { Booking } from '../lib/types';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
 import PageHelpButton from '../components/ui/PageHelpButton';
@@ -27,9 +28,17 @@ const STATUS_ACTIONS: { status: ORRoomStatus; label: string; style: string }[] =
   { status: 'deferred',   label: 'Deferred',   style: 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200' },
 ];
 
+// Context label styles for the featured case display
+const CONTEXT_LABELS: Record<string, { text: string; color: string; bg: string; dotColor?: string }> = {
+  ongoing:    { text: 'Ongoing',    color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', dotColor: 'bg-emerald-500' },
+  in_transit: { text: 'In Transit', color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200',   dotColor: 'bg-amber-500' },
+  up_next:    { text: 'Up Next',    color: 'text-blue-600',    bg: 'bg-blue-50 border-blue-200' },
+};
+
 export default function LiveBoardPage() {
   const { user } = useAuthStore();
   const { liveStatuses, setLiveStatus } = useORRoomsStore();
+  const { updateBooking } = useBookingsStore();
   const isAnesthAdmin = user?.role === 'anesthesiology_admin';
 
   // Pending confirmation state
@@ -45,43 +54,164 @@ export default function LiveBoardPage() {
     setPending({ roomId, roomName, from, to });
   };
 
-  const confirmStatusChange = () => {
-    if (!pending) return;
-    setLiveStatus(pending.roomId, pending.to);
-    // Send notifications for significant status changes
-    notifyRoomStatusChange(pending.roomName, pending.to, user?.full_name || 'Admin');
-    if (user) auditRoomStatusChange(user.id, pending.roomId, pending.roomName, pending.from, pending.to);
-    setPending(null);
-  };
-
   const { rooms } = useORRoomsStore();
   const { bookings } = useBookingsStore();
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Derive computed status from bookings as a fallback
+  // ── Helpers ──
+
+  const sortByTime = (a: Booking, b: Booking) => a.start_time.localeCompare(b.start_time);
+
+  /** Today's active bookings for a room (approved, ongoing, completed only), sorted by time */
+  const getRoomTodayBookings = (roomId: string) =>
+    bookings
+      .filter((b) => b.or_room_id === roomId && b.date === today && ['approved', 'ongoing', 'completed'].includes(b.status))
+      .sort(sortByTime);
+
+  /** Currently ongoing booking for a room */
+  const getOngoingBooking = (roomId: string) =>
+    bookings.find((b) => b.or_room_id === roomId && b.date === today && b.status === 'ongoing');
+
+  /** Next queued booking (approved, not yet started) */
+  const getNextQueuedBooking = (roomId: string) =>
+    bookings
+      .filter((b) => b.or_room_id === roomId && b.date === today && b.status === 'approved')
+      .sort(sortByTime)[0] || undefined;
+
+  /** Derived room status from bookings as a fallback */
   const getComputedStatus = (roomId: string): ORRoomStatus => {
-    const roomBookings = bookings.filter(
-      (b) => b.or_room_id === roomId && b.date === today && !['cancelled', 'denied'].includes(b.status)
-    );
-    if (roomBookings.find((b) => b.status === 'ongoing')) return 'ongoing';
-    const completed = roomBookings.filter((b) => b.status === 'completed');
-    if (completed.length === roomBookings.length && roomBookings.length > 0) return 'ended';
+    const rb = getRoomTodayBookings(roomId);
+    if (rb.find((b) => b.status === 'ongoing')) return 'ongoing';
+    if (rb.length > 0 && rb.every((b) => b.status === 'completed')) return 'ended';
     return 'idle';
   };
 
-  const getRoomLiveStatus = (roomId: string): ORRoomStatus => {
-    return (liveStatuses[roomId]?.status as ORRoomStatus) ?? getComputedStatus(roomId);
+  const getRoomLiveStatus = (roomId: string): ORRoomStatus =>
+    (liveStatuses[roomId]?.status as ORRoomStatus) ?? getComputedStatus(roomId);
+
+  /** Determine the featured booking and context label for a room card */
+  const getCardDisplay = (roomId: string): {
+    booking?: Booking;
+    contextKey?: 'ongoing' | 'in_transit' | 'up_next';
+    emptyMessage?: string;
+  } => {
+    const status = getRoomLiveStatus(roomId);
+
+    switch (status) {
+      case 'ongoing': {
+        const ongoing = getOngoingBooking(roomId) ?? getNextQueuedBooking(roomId);
+        return ongoing
+          ? { booking: ongoing, contextKey: 'ongoing' }
+          : { emptyMessage: 'No active case' };
+      }
+      case 'in_transit': {
+        const ls = liveStatuses[roomId];
+        const transitBooking = ls?.current_booking_id
+          ? bookings.find((b) => b.id === ls.current_booking_id)
+          : getNextQueuedBooking(roomId);
+        return transitBooking
+          ? { booking: transitBooking, contextKey: 'in_transit' }
+          : { emptyMessage: 'No case assigned' };
+      }
+      case 'idle': {
+        const next = getNextQueuedBooking(roomId);
+        return next
+          ? { booking: next, contextKey: 'up_next' }
+          : { emptyMessage: 'No cases scheduled' };
+      }
+      case 'ended': {
+        const next = getNextQueuedBooking(roomId);
+        return next
+          ? { booking: next, contextKey: 'up_next' }
+          : { emptyMessage: 'All cases completed' };
+      }
+      case 'deferred':
+        return { emptyMessage: 'Case deferred' };
+      default:
+        return { emptyMessage: 'No active case' };
+    }
   };
 
-  const getCurrentBooking = (roomId: string) => {
-    const status = getRoomLiveStatus(roomId);
-    if (status === 'ongoing' || status === 'in_transit') {
-      return bookings.find(
-        (b) => b.or_room_id === roomId && b.date === today &&
-          ['ongoing', 'approved'].includes(b.status)
-      );
+  /** Contextual description of what a status change will do */
+  const getPendingDescription = (): string => {
+    if (!pending) return '';
+    const { roomId, to } = pending;
+
+    if (to === 'ongoing') {
+      const next = getNextQueuedBooking(roomId);
+      if (next) return `"${next.procedure}" for ${next.patient_name} will be marked as ongoing.`;
+      return 'Room will be set to ongoing.';
     }
-    return undefined;
+    if (to === 'in_transit') {
+      const next = getNextQueuedBooking(roomId);
+      if (next) return `Patient "${next.patient_name}" is being transported for "${next.procedure}".`;
+      return 'Room will be set to in transit.';
+    }
+    if (to === 'ended') {
+      const ongoing = getOngoingBooking(roomId);
+      const next = getNextQueuedBooking(roomId);
+      const parts: string[] = [];
+      if (ongoing) parts.push(`"${ongoing.procedure}" will be marked as completed.`);
+      if (next) parts.push(`Next up: "${next.procedure}".`);
+      return parts.length > 0 ? parts.join(' ') : 'Room will be set to ended.';
+    }
+    if (to === 'deferred') {
+      const ongoing = getOngoingBooking(roomId);
+      if (ongoing) return `"${ongoing.procedure}" will be deferred.`;
+      return 'Room will be set to deferred.';
+    }
+    return '';
+  };
+
+  // ── Enhanced status change handler — syncs booking statuses ──
+  const confirmStatusChange = async () => {
+    if (!pending) return;
+    const { roomId, to, from } = pending;
+
+    try {
+      if (to === 'ongoing') {
+        // Mark the next queued booking as ongoing
+        const nextBooking = getNextQueuedBooking(roomId);
+        if (nextBooking) {
+          await updateBooking(nextBooking.id, { status: 'ongoing' });
+          await setLiveStatus(roomId, to, nextBooking.id);
+        } else {
+          await setLiveStatus(roomId, to);
+        }
+      } else if (to === 'in_transit') {
+        // Associate next booking with the room in transit
+        const nextBooking = getNextQueuedBooking(roomId);
+        if (nextBooking) {
+          await setLiveStatus(roomId, to, nextBooking.id);
+        } else {
+          await setLiveStatus(roomId, to);
+        }
+      } else if (to === 'ended') {
+        // Complete the currently ongoing booking
+        const ongoingBooking = getOngoingBooking(roomId);
+        if (ongoingBooking) {
+          await updateBooking(ongoingBooking.id, { status: 'completed' });
+        }
+        await setLiveStatus(roomId, to);
+      } else if (to === 'deferred') {
+        // Cancel/defer the ongoing booking
+        const ongoingBooking = getOngoingBooking(roomId);
+        if (ongoingBooking) {
+          await updateBooking(ongoingBooking.id, { status: 'cancelled' });
+          notifyBookingCancelled(ongoingBooking, user?.full_name || 'Admin');
+        }
+        await setLiveStatus(roomId, to);
+      } else {
+        // idle — just set room status
+        await setLiveStatus(roomId, to);
+      }
+    } catch (err) {
+      console.error('Failed to update status:', err);
+    }
+
+    notifyRoomStatusChange(pending.roomName, to, user?.full_name || 'Admin');
+    if (user) auditRoomStatusChange(user.id, roomId, pending.roomName, from, to);
+    setPending(null);
   };
 
   return (
@@ -122,10 +252,9 @@ export default function LiveBoardPage() {
         {rooms.map((room, i) => {
           const status = getRoomLiveStatus(room.id);
           const statusInfo = getRoomStatusInfo(status);
-          const currentBooking = getCurrentBooking(room.id);
-          const todayBookings = bookings.filter(
-            (b) => b.or_room_id === room.id && b.date === today && !['cancelled', 'denied'].includes(b.status)
-          );
+          const { booking: displayBooking, contextKey, emptyMessage } = getCardDisplay(room.id);
+          const todayBookings = getRoomTodayBookings(room.id);
+          const contextLabel = contextKey ? CONTEXT_LABELS[contextKey] : null;
 
           return (
             <motion.div
@@ -155,48 +284,62 @@ export default function LiveBoardPage() {
                 </div>
               </div>
 
-              {/* Current case details */}
+              {/* Featured case display */}
               <div className="px-4 py-3">
-                {currentBooking ? (
+                {displayBooking && contextLabel ? (
                   <div className="space-y-2.5">
+                    {/* Context label pill */}
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${contextLabel.bg} ${contextLabel.color}`}>
+                        {contextLabel.dotColor && (
+                          <span className={`w-1.5 h-1.5 rounded-full ${contextLabel.dotColor} animate-pulse`} />
+                        )}
+                        {contextLabel.text}
+                      </span>
+                    </div>
+
+                    {/* Case details */}
                     <div className="flex items-center gap-2.5">
-                      <div className="w-1 h-8 rounded-full" style={{ backgroundColor: getDeptColor(currentBooking.department_id) }} />
+                      <div className="w-1 h-8 rounded-full" style={{ backgroundColor: getDeptColor(displayBooking.department_id) }} />
                       <div>
-                        <p className="text-[14px] font-semibold text-gray-900">{currentBooking.procedure}</p>
-                        <p className="text-[11px] font-medium" style={{ color: getDeptColor(currentBooking.department_id) }}>
-                          {getDeptName(currentBooking.department_id)}
+                        <p className="text-[14px] font-semibold text-gray-900">{displayBooking.procedure}</p>
+                        <p className="text-[11px] font-medium" style={{ color: getDeptColor(displayBooking.department_id) }}>
+                          {getDeptName(displayBooking.department_id)}
                         </p>
                       </div>
                     </div>
                     <div className="space-y-1.5 text-[12px] pl-3.5">
                       <div className="flex items-center gap-2 text-gray-600">
                         <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <span>{currentBooking.patient_name}</span>
+                        <span>{displayBooking.patient_name}</span>
                       </div>
                       <div className="flex items-center gap-2 text-gray-600">
                         <Stethoscope className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <span>{currentBooking.surgeon.split('/')[0]}</span>
+                        <span>{displayBooking.surgeon.split('/')[0]}</span>
                       </div>
                       <div className="flex items-center gap-2 text-gray-600">
                         <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <span>{formatTime(currentBooking.start_time)} – {formatTime(currentBooking.end_time)}</span>
+                        <span>{formatTime(displayBooking.start_time)} – {formatTime(displayBooking.end_time)}</span>
                       </div>
                     </div>
                   </div>
-                ) : status === 'deferred' ? (
+                ) : emptyMessage ? (
                   <div className="text-center py-5">
-                    <p className="text-[13px] text-red-400 font-medium">Case deferred</p>
+                    {status === 'deferred' ? (
+                      <p className="text-[13px] text-red-400 font-medium">{emptyMessage}</p>
+                    ) : status === 'ended' ? (
+                      <>
+                        <CheckCircle2 className="w-8 h-8 text-gray-200 mx-auto mb-1.5" />
+                        <p className="text-[13px] text-gray-400">{emptyMessage}</p>
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="w-8 h-8 text-gray-200 mx-auto mb-1.5" />
+                        <p className="text-[13px] text-gray-400">{emptyMessage}</p>
+                      </>
+                    )}
                   </div>
-                ) : status === 'idle' ? (
-                  <div className="text-center py-5">
-                    <Activity className="w-8 h-8 text-gray-200 mx-auto mb-1.5" />
-                    <p className="text-[13px] text-gray-400">No active case</p>
-                  </div>
-                ) : (
-                  <div className="text-center py-5">
-                    <p className="text-[13px] text-gray-400">All cases completed</p>
-                  </div>
-                )}
+                ) : null}
               </div>
 
               {/* Anesthesia admin: status controls */}
@@ -221,23 +364,36 @@ export default function LiveBoardPage() {
                 </div>
               )}
 
-              {/* Upcoming queue */}
+              {/* Today's queue */}
               {todayBookings.length > 0 && (
                 <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
                     Today's Queue ({todayBookings.length})
                   </p>
                   <div className="space-y-1.5">
-                    {todayBookings.slice(0, 3).map((b) => (
-                      <div key={b.id} className="flex items-center justify-between">
-                        <span className="text-[11px] text-gray-600 truncate flex-1 mr-2">
+                    {todayBookings.slice(0, 4).map((b) => (
+                      <div
+                        key={b.id}
+                        className={`flex items-center justify-between ${
+                          b.status === 'completed' ? 'opacity-60' : ''
+                        }`}
+                      >
+                        <span
+                          className={`text-[11px] truncate flex-1 mr-2 ${
+                            b.status === 'completed'
+                              ? 'text-gray-400 line-through'
+                              : b.status === 'ongoing'
+                              ? 'text-emerald-700 font-semibold'
+                              : 'text-gray-600'
+                          }`}
+                        >
                           {formatTime(b.start_time)} {b.procedure.slice(0, 22)}
                         </span>
                         <StatusBadge status={b.status} size="sm" />
                       </div>
                     ))}
-                    {todayBookings.length > 3 && (
-                      <p className="text-[11px] text-gray-400">+{todayBookings.length - 3} more</p>
+                    {todayBookings.length > 4 && (
+                      <p className="text-[11px] text-gray-400">+{todayBookings.length - 4} more</p>
                     )}
                   </div>
                 </div>
@@ -288,6 +444,13 @@ export default function LiveBoardPage() {
                   {getRoomStatusInfo(pending.to).label}
                 </span>
               </div>
+
+              {/* Contextual description of what will happen */}
+              {getPendingDescription() && (
+                <p className="text-[13px] text-gray-600 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2">
+                  {getPendingDescription()}
+                </p>
+              )}
 
               <p className="text-sm text-gray-500">
                 Are you sure you want to change the status of <span className="font-medium text-gray-700">{pending.roomName}</span> to{' '}

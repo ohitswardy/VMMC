@@ -11,10 +11,10 @@ import { TimePicker } from '../ui/TimePicker';
 import { useBookingsStore } from '../../stores/appStore';
 import { useAuthStore } from '../../stores/authStore';
 import {
-  DEPARTMENTS, PATIENT_CATEGORIES, ANES_DEPARTMENT_CONTACT,
+  PATIENT_CATEGORIES, ANES_DEPARTMENT_CONTACT,
   type DepartmentId
 } from '../../lib/constants';
-import { hasRoomConflict, hasAnesthesiologistConflict, timeRangesOverlap, formatTime, getBookingDeadlineStatus } from '../../lib/utils';
+import { hasRoomConflict, hasAnesthesiologistConflict, timeRangesOverlap, formatTime, getBookingDeadlineStatus, getDeptName } from '../../lib/utils';
 import {
   auditBookingCreate,
   auditBookingUpdate,
@@ -25,8 +25,10 @@ import {
   notifyBookingConfirmation,
   notifyEmergencyInsertion,
   notifyBumpedCases,
+  notifyAdminDelegatedBooking,
 } from '../../lib/notificationHelper';
-import type { Booking, ORRoom } from '../../lib/types';
+import { fetchAllProfiles } from '../../lib/supabaseService';
+import type { Booking, ORRoom, UserProfile } from '../../lib/types';
 
 interface Props {
   isOpen: boolean;
@@ -37,6 +39,7 @@ interface Props {
 
 const defaultForm = {
   or_room_id: '',
+  department_id: '' as string,
   date: format(new Date(), 'yyyy-MM-dd'),
   start_time: '08:00',
   end_time: '10:00',
@@ -68,6 +71,7 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
     if (editingBooking) {
       return {
         or_room_id: editingBooking.or_room_id || '',
+        department_id: (editingBooking.department_id || '') as string,
         date: editingBooking.date || format(selectedDate, 'yyyy-MM-dd'),
         start_time: editingBooking.start_time || '08:00',
         end_time: editingBooking.end_time || '10:00',
@@ -100,6 +104,23 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBumpConfirm, setShowBumpConfirm] = useState(false);
+  const [deptAccounts, setDeptAccounts] = useState<UserProfile[]>([]);
+
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
+  const userDept = user?.department_id;
+  const canSelectDept = isAdmin;
+
+  // Fetch active department user accounts for the department selector (admin only)
+  useEffect(() => {
+    if (!isOpen || !canSelectDept) return;
+    fetchAllProfiles()
+      .then((profiles) =>
+        setDeptAccounts(
+          profiles.filter((p) => p.is_active && p.role === 'department_user' && p.department_id)
+        )
+      )
+      .catch(console.error);
+  }, [isOpen, canSelectDept]);
 
   // Reset form whenever the modal opens so room & date match the calendar selection
   useEffect(() => {
@@ -107,6 +128,7 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
     if (editingBooking) {
       setForm({
         or_room_id: editingBooking.or_room_id || '',
+        department_id: (editingBooking.department_id || '') as string,
         date: editingBooking.date || format(selectedDate, 'yyyy-MM-dd'),
         start_time: editingBooking.start_time || '08:00',
         end_time: editingBooking.end_time || '10:00',
@@ -133,15 +155,13 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
       setForm({
         ...defaultForm,
         or_room_id: selectedRoom || '',
+        department_id: (userDept || '') as string,
         date: format(selectedDate, 'yyyy-MM-dd'),
       });
     }
     setErrors({});
     setShowBumpConfirm(false);
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
-  const userDept = user?.department_id;
 
   // CP categories are the only ones where anesthesiologist is selected during booking
   const isCP = form.patient_category.startsWith('CP');
@@ -210,6 +230,7 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.or_room_id) errs.or_room_id = 'Select an OR room';
+    if (canSelectDept && !form.department_id) errs.department_id = 'Select a department';
     if (!form.date) errs.date = 'Select a date';
     if (!form.start_time) errs.start_time = 'Set start time';
     if (!form.end_time) errs.end_time = 'Set end time';
@@ -283,7 +304,7 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
 
     const newBooking: Omit<Booking, 'id' | 'created_at' | 'updated_at'> = {
       or_room_id: form.or_room_id,
-      department_id: (isAdmin ? 'GS' : userDept || 'GS') as DepartmentId,
+      department_id: (form.department_id || userDept || 'GS') as DepartmentId,
       date: form.date,
       start_time: form.start_time,
       end_time: form.end_time,
@@ -334,6 +355,10 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
         notifyNewBookingRequest(created);
         // Confirm to the creator
         notifyBookingConfirmation(created);
+        // If admin is booking on behalf of a department, notify that department
+        if (canSelectDept && form.department_id && form.department_id !== userDept) {
+          notifyAdminDelegatedBooking(created, user?.full_name || 'Admin', form.department_id as DepartmentId);
+        }
         if (user) auditBookingCreate(user.id, created);
         toast.success('Booking request submitted successfully!');
       }
@@ -442,6 +467,28 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
               </div>
             )}
           </>
+        )}
+
+        {/* Department selector (admin only — uses real department user accounts) */}
+        {canSelectDept && (
+          <div className="p-3 rounded-[8px] bg-indigo-50 border border-indigo-100">
+            <CustomSelect
+              label="Booking on behalf of Department"
+              value={form.department_id}
+              onChange={(val) => updateField('department_id', val)}
+              options={
+                deptAccounts.length > 0
+                  ? deptAccounts.map((u) => ({
+                      value: u.department_id as string,
+                      label: `${getDeptName(u.department_id as DepartmentId)} — ${u.full_name}`,
+                    }))
+                  : [{ value: '', label: 'Loading departments…' }]
+              }
+              placeholder="Select department…"
+              error={errors.department_id}
+              required
+            />
+          </div>
         )}
 
         {/* Row: Room & Date */}

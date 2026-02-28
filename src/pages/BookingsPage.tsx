@@ -1,22 +1,30 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronLeft, ChevronRight, CalendarDays, Clock, ChevronDown, CalendarRange } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, CalendarDays, Clock, ChevronDown, CalendarRange, FileText, CheckCircle, XCircle } from 'lucide-react';
 import {
   format, addDays, subDays, isToday, addMonths, subMonths,
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
   isSameMonth, isSameDay,
 } from 'date-fns';
+import toast from 'react-hot-toast';
 import { useORRoomsStore } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { DEPARTMENTS, BOOKING_STATUSES } from '../lib/constants';
 import { getDeptColor, getDeptName, formatTime } from '../lib/utils';
 import StatusBadge from '../components/ui/StatusBadge';
 import { CustomSelect } from '../components/ui/CustomSelect';
-import { useBookingsStore } from '../stores/appStore';
+import { useBookingsStore, useChangeRequestsStore } from '../stores/appStore';
 import BookingDetailModal from '../components/booking/BookingDetailModal';
 import ChangeScheduleModal from '../components/booking/ChangeScheduleModal';
 import PageHelpButton from '../components/ui/PageHelpButton';
 import { BOOKINGS_HELP } from '../lib/helpContent';
+import {
+  notifyChangeRequestApproved,
+  notifyChangeRequestDenied,
+} from '../lib/notificationHelper';
+import {
+  auditChangeRequestReview,
+} from '../lib/auditHelper';
 import type { Booking, ORRoom } from '../lib/types';
 
 const fadeUp = {
@@ -268,18 +276,77 @@ function BookingCard({
 export default function BookingsPage() {
   const { user } = useAuthStore();
   const { isChangeFormOpen, changeBooking, closeChangeForm } = useBookingsStore();
-  const { bookings } = useBookingsStore();
+  const { bookings, updateBooking } = useBookingsStore();
   const { rooms } = useORRoomsStore();
+  const { requests, loadRequests, updateRequest } = useChangeRequestsStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   const [viewMode, setViewMode] = useState<'day' | '2week'>('day');
+  const [showChangeRequests, setShowChangeRequests] = useState(true);
+  const [denyingRequestId, setDenyingRequestId] = useState<string | null>(null);
+  const [denyReasonText, setDenyReasonText] = useState('');
+  const [crActionLoading, setCrActionLoading] = useState<string | null>(null);
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
   const dateStr = format(currentDate, 'yyyy-MM-dd');
   const endDateStr = format(addDays(currentDate, 13), 'yyyy-MM-dd');
+
+  // Load change requests on mount for admins
+  useEffect(() => {
+    if (isAdmin) loadRequests();
+  }, [isAdmin, loadRequests]);
+
+  const pendingRequests = useMemo(
+    () => requests.filter((r) => r.status === 'pending'),
+    [requests]
+  );
+
+  const handleApproveRequest = async (requestId: string) => {
+    const req = requests.find((r) => r.id === requestId);
+    if (!req) return;
+    const booking = bookings.find((b) => b.id === req.original_booking_id);
+    if (!booking) { toast.error('Original booking not found.'); return; }
+
+    setCrActionLoading(requestId);
+    await updateRequest(requestId, {
+      status: 'approved',
+      reviewed_by: user?.id,
+    });
+    // Apply the schedule change to the original booking
+    await updateBooking(booking.id, {
+      date: req.new_date,
+      start_time: req.new_preferred_time,
+      status: 'approved',
+      updated_at: new Date().toISOString(),
+    });
+    notifyChangeRequestApproved(booking, req.created_by, user?.full_name || 'Admin', req.new_date, req.new_preferred_time);
+    if (user) auditChangeRequestReview(user.id, requestId, booking.id, 'approved');
+    toast.success('Change request approved and booking updated.');
+    setCrActionLoading(null);
+  };
+
+  const handleDenyRequest = async (requestId: string) => {
+    if (!denyReasonText.trim()) { toast.error('Enter a denial reason.'); return; }
+    const req = requests.find((r) => r.id === requestId);
+    if (!req) return;
+    const booking = bookings.find((b) => b.id === req.original_booking_id);
+    if (!booking) { toast.error('Original booking not found.'); return; }
+
+    setCrActionLoading(requestId);
+    await updateRequest(requestId, {
+      status: 'denied',
+      reviewed_by: user?.id,
+    });
+    notifyChangeRequestDenied(booking, req.created_by, user?.full_name || 'Admin', denyReasonText.trim());
+    if (user) auditChangeRequestReview(user.id, requestId, booking.id, 'denied', denyReasonText.trim());
+    toast.success('Change request denied.');
+    setDenyingRequestId(null);
+    setDenyReasonText('');
+    setCrActionLoading(null);
+  };
 
   const filtered = useMemo(() => {
     let result = bookings;
@@ -411,6 +478,100 @@ export default function BookingsPage() {
           </div>
         )}
       </div>
+
+      {/* ── Change Request Review Panel (admin only) ── */}
+      {isAdmin && pendingRequests.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-[10px] overflow-hidden">
+          <button
+            onClick={() => setShowChangeRequests((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-amber-100/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-amber-600" />
+              <span className="text-[13px] font-semibold text-amber-800">
+                Pending Change Requests ({pendingRequests.length})
+              </span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-amber-500 transition-transform ${showChangeRequests ? 'rotate-180' : ''}`} />
+          </button>
+          {showChangeRequests && (
+            <div className="px-4 pb-3 space-y-2">
+              {pendingRequests.map((req) => {
+                const booking = bookings.find((b) => b.id === req.original_booking_id);
+                const isDenying = denyingRequestId === req.id;
+                return (
+                  <div key={req.id} className="bg-white rounded-lg border border-amber-100 p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-gray-900">{req.procedure}</p>
+                        <p className="text-[12px] text-gray-500">
+                          {getDeptName(req.department_id)} · {req.patient_details}
+                        </p>
+                        <p className="text-[12px] text-gray-500 mt-0.5">
+                          Requested: <span className="font-medium text-gray-700">{req.new_date} {formatTime(req.new_preferred_time)}</span>
+                          {' · '}{req.reason}{req.reason_other ? ` — ${req.reason_other}` : ''}
+                        </p>
+                        {booking && (
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            Original: {booking.date} {formatTime(booking.start_time)} · {booking.procedure}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-gray-400 flex-shrink-0">
+                        {format(new Date(req.created_at), 'MMM d, h:mm a')}
+                      </span>
+                    </div>
+                    {isDenying ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={denyReasonText}
+                          onChange={(e) => setDenyReasonText(e.target.value)}
+                          placeholder="Denial reason..."
+                          className="flex-1 text-[12px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:border-accent-300 focus:ring-1 focus:ring-accent-200 outline-none"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleDenyRequest(req.id)}
+                          disabled={crActionLoading === req.id}
+                          className="px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+                        >
+                          Confirm Deny
+                        </button>
+                        <button
+                          onClick={() => { setDenyingRequestId(null); setDenyReasonText(''); }}
+                          className="px-2 py-1.5 text-[11px] text-gray-500 hover:text-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleApproveRequest(req.id)}
+                          disabled={crActionLoading === req.id}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => setDenyingRequestId(req.id)}
+                          disabled={crActionLoading === req.id}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                        >
+                          <XCircle className="w-3 h-3" />
+                          Deny
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-[10px] border border-gray-200 px-3 md:px-4 py-3 space-y-2 md:space-y-0 md:flex md:flex-wrap md:gap-3">
