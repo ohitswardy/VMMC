@@ -52,6 +52,7 @@ export default function App() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   // ── Session idle-timeout state ──
+
   const [showIdleWarning, setShowIdleWarning] = useState(false);
   const idleCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [idleCountdown, setIdleCountdown] = useState(IDLE_WARNING_MS / 1000); // seconds
@@ -90,9 +91,6 @@ export default function App() {
     onWarning: handleIdleWarning,
     onWarningDismiss: handleIdleWarningDismiss,
   });
-  // Track the previous auth state to detect fresh logins
-  const prevAuthRef = useRef(isAuthenticated);
-
   // Refs for tracking already-sent reminders / purge warnings (persists across interval ticks)
   const sentReminderRef = useRef(new Set<string>());
   const sentPurgeRef = useRef(new Set<string>());
@@ -102,22 +100,15 @@ export default function App() {
     initAuth();
   }, [initAuth]);
 
-  // Show Data Privacy Modal on fresh login or policy version update
+  // Show Data Privacy Modal once per login.
+  // Logout clears the localStorage ack (authStore), so the next login always shows it.
+  // Page refresh keeps the ack → modal stays hidden.
+  // Bumping PRIVACY_POLICY_VERSION also re-triggers it for all users.
   useEffect(() => {
     if (isAuthenticated && user && !authLoading) {
-      const wasAuthenticated = prevAuthRef.current;
-      prevAuthRef.current = true;
-
-      // Fresh login: always show
-      if (!wasAuthenticated) {
+      if (!hasAcknowledgedCurrentPolicy(user.id)) {
         setShowPrivacyModal(true);
       }
-      // Session restore: re-show only if policy version is newer
-      else if (!hasAcknowledgedCurrentPolicy(user.id)) {
-        setShowPrivacyModal(true);
-      }
-    } else {
-      prevAuthRef.current = false;
     }
   }, [isAuthenticated, user, authLoading]);
 

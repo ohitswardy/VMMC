@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { UserProfile } from '../lib/types';
 import { signIn, signOut, getSession, fetchProfile } from '../lib/supabaseService';
 import { auditLogin, auditLogout } from '../lib/auditHelper';
+import { clearPrivacyAcknowledgment } from '../lib/privacyPolicy';
 import { supabase } from '../lib/supabase';
 import type { Subscription } from '@supabase/supabase-js';
 
@@ -60,6 +61,8 @@ export const useAuthStore = create<AuthState>()(
           if (state.user) {
             auditLogout(state.user.id).catch(() => {});
           }
+          // Clear privacy acknowledgment so the modal re-appears on next login
+          clearPrivacyAcknowledgment();
           // Clear state FIRST so the UI navigates to login immediately
           set({ user: null, isAuthenticated: false, isLoading: false });
           await signOut().catch(() => {});

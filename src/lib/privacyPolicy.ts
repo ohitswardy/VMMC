@@ -128,3 +128,11 @@ export function acknowledgePolicy(userId: string): void {
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ack));
 }
+
+/**
+ * Clear the acknowledgment so the modal re-appears on the next login.
+ * Call this on logout.
+ */
+export function clearPrivacyAcknowledgment(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
