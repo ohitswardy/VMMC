@@ -2,14 +2,14 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Plus, AlertTriangle,
-  Clock, User, MapPin, Printer
+  Clock, User, MapPin, Printer, Users
 } from 'lucide-react';
 import {
   format, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval,
   isToday, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths,
   subMonths, isSameMonth, isSameDay
 } from 'date-fns';
-import { useBookingsStore, useORRoomsStore, useORPriorityScheduleStore } from '../stores/appStore';
+import { useBookingsStore, useORRoomsStore, useORPriorityScheduleStore, usePACUStore, useSignatoryStore } from '../stores/appStore';
 import PageHelpButton from '../components/ui/PageHelpButton';
 import { OR_CALENDAR_HELP } from '../lib/helpContent';
 import { useAuthStore } from '../stores/authStore';
@@ -44,6 +44,8 @@ export default function ORCalendarPage() {
   const { rooms } = useORRoomsStore();
   const { bookings } = useBookingsStore();
   const { schedule } = useORPriorityScheduleStore();
+  const { assignments, setAssignment } = usePACUStore();
+  const { config: signatory } = useSignatoryStore();
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
   const isDeptUser = user?.role === 'department_user';
@@ -51,7 +53,8 @@ export default function ORCalendarPage() {
 
   const handlePrintPDF = async () => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    await generateSchedulePDF(dateStr, bookings, rooms);
+    const pacuNames = assignments[dateStr] || '';
+    await generateSchedulePDF(dateStr, bookings, rooms, pacuNames, signatory);
   };
 
   /* -- navigation -- */
@@ -85,9 +88,10 @@ export default function ORCalendarPage() {
     setDetailOpen(true);
   };
 
-  const handleSlotClick = (roomId: string | null, date: Date) => {
+  const handleSlotClick = (roomId: string | null, date: Date, time?: string) => {
     if (!canBook) return;
     useBookingsStore.getState().setSelectedRoom(roomId);
+    useBookingsStore.getState().setSelectedTime(time || null);
     setSelectedDate(date);
     openForm();
   };
@@ -243,6 +247,23 @@ export default function ORCalendarPage() {
         )}
       </div>
 
+      {/* PACU Resident Input — admin only */}
+      {isAdmin && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 md:px-4 flex flex-col sm:flex-row sm:items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 whitespace-nowrap shrink-0">
+            <Users className="w-3.5 h-3.5" />
+            PACU Residents:
+          </label>
+          <input
+            type="text"
+            value={assignments[format(selectedDate, 'yyyy-MM-dd')] || ''}
+            onChange={(e) => setAssignment(format(selectedDate, 'yyyy-MM-dd'), e.target.value)}
+            placeholder="e.g. Sarmiento/Montesa/Castillo"
+            className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300 transition-colors"
+          />
+        </div>
+      )}
+
       {/* Calendar Content */}
       <AnimatePresence mode="wait" initial={false}>
         {viewMode === 'month' && (
@@ -267,7 +288,7 @@ export default function ORCalendarPage() {
             exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
             <DayView rooms={rooms} date={selectedDate} timeSlots={timeSlots}
               getBookingsForRoomDate={getBookingsForRoomDate} onBookingClick={handleBookingClick}
-              onSlotClick={(rid, d) => handleSlotClick(rid, d)} canBook={canBook}
+              onSlotClick={(rid, d, t) => handleSlotClick(rid, d, t)} canBook={canBook}
               mobileRoomIdx={mobileRoomIdx} schedule={schedule} />
           </motion.div>
         )}
@@ -661,7 +682,7 @@ function DayView({
   timeSlots: string[];
   getBookingsForRoomDate: (roomId: string, d: Date) => Booking[];
   onBookingClick: (b: Booking) => void;
-  onSlotClick: (roomId: string, d: Date) => void;
+  onSlotClick: (roomId: string, d: Date, time?: string) => void;
   canBook: boolean;
   mobileRoomIdx: number;
   schedule: Record<string, string>;
@@ -743,7 +764,7 @@ function DayView({
             <div
               key={slot}
               className="flex border-b border-gray-50 min-h-[52px]"
-              onClick={() => canBook && mobileRoom && onSlotClick(mobileRoom.id, date)}
+              onClick={() => canBook && mobileRoom && onSlotClick(mobileRoom.id, date, slot)}
             >
               <div className="w-14 shrink-0 px-2 py-2 border-r border-gray-100 flex items-start">
                 <span className="text-[10px] text-gray-400 font-medium tabular-nums">{formatTime(slot)}</span>
@@ -846,13 +867,24 @@ function DayView({
               <div
                 key={room.id}
                 className="relative border-r border-gray-100 last:border-r-0"
-                onClick={() => canBook && onSlotClick(room.id, date)}
                 style={{ cursor: canBook ? 'pointer' : 'default' }}
               >
                 {timeSlots.map(slot => (
-                  <div key={slot} className="h-14 border-b border-gray-50 hover:bg-accent-50/20 transition-colors" />
+                  <div
+                    key={slot}
+                    className="h-14 border-b border-gray-50"
+                  />
                 ))}
-                <div className="absolute inset-0">
+                {/* Overlay: intercepts background clicks and maps Y→slot */}
+                <div
+                  className="absolute inset-0"
+                  onClick={(e) => {
+                    if (!canBook) return;
+                    const slotIndex = Math.floor(e.nativeEvent.offsetY / SLOT_PX);
+                    const slot = timeSlots[Math.min(slotIndex, timeSlots.length - 1)];
+                    onSlotClick(room.id, date, slot);
+                  }}
+                >
                   {roomBookings.map(booking => {
                     const style = getBookingStyle(booking);
                     const deptColor = getDeptColor(booking.department_id);

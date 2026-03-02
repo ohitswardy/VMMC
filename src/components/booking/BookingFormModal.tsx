@@ -63,7 +63,7 @@ const defaultForm = {
 
 export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: Props) {
   const { user } = useAuthStore();
-  const { editingBooking, selectedRoom, selectedDate, addBooking, updateBooking } = useBookingsStore();
+  const { editingBooking, selectedRoom, selectedDate, selectedTime, addBooking, updateBooking } = useBookingsStore();
 
   const isEditing = !!editingBooking;
 
@@ -152,11 +152,23 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
         emergency_reason: editingBooking.emergency_reason || '',
       });
     } else {
+      let timeOverrides: { start_time?: string; end_time?: string } = {};
+      if (selectedTime) {
+        const [h, m] = selectedTime.split(':').map(Number);
+        const endTotalMin = h * 60 + m + 60;
+        const endH = Math.floor(endTotalMin / 60) % 24;
+        const endM = endTotalMin % 60;
+        timeOverrides = {
+          start_time: selectedTime,
+          end_time: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
+        };
+      }
       setForm({
         ...defaultForm,
         or_room_id: selectedRoom || '',
         department_id: (userDept || '') as string,
         date: format(selectedDate, 'yyyy-MM-dd'),
+        ...timeOverrides,
       });
     }
     setErrors({});

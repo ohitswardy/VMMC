@@ -56,15 +56,21 @@ export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props)
     setIsSubmitting(true);
     try {
       await addRequest({
-        booking_id: booking.id,
-        requested_by: user?.id || '',
+        original_booking_id: booking.id,
+        created_by: user?.id || '',
         department_id: form.department_id,
+        im_subspecialty: form.im_subspecialty || undefined,
+        im_subspecialty_other: form.im_subspecialty_other || undefined,
         new_date: form.new_date,
-        new_start_time: form.new_preferred_time,
+        new_preferred_time: form.new_preferred_time,
+        patient_details: form.patient_details,
+        procedure: form.procedure,
+        preferred_anesthesiologist: form.preferred_anesthesiologist || undefined,
         reason: form.reason === 'Others' ? (form.reason_other || form.reason) : form.reason,
-        notes: form.additional_info || undefined,
+        reason_other: form.reason === 'Others' ? form.reason_other : undefined,
+        additional_info: form.additional_info || undefined,
         status: 'pending',
-      } as any);
+      });
 
       // Notify admins about the change request
       const reason = form.reason === 'Others' ? (form.reason_other || form.reason) : form.reason;
@@ -109,8 +115,6 @@ export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props)
             <p className="text-xs text-blue-600">
               For urgent changes within 24 hours of the scheduled procedure
             </p>
-            <p className="text-xs text-blue-700 font-medium mt-1">📞 {ANES_DEPARTMENT_CONTACT.phone}</p>
-            <p className="text-xs text-blue-700 font-medium">✉️ {ANES_DEPARTMENT_CONTACT.email}</p>
           </div>
           <Button variant="secondary" className="mt-6" onClick={onClose}>
             Close

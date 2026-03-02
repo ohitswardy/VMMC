@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Calendar } from 'lucide-react';
+import { FileText, Calendar, Users, UserCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { format, subDays, eachDayOfInterval } from 'date-fns';
-import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
+import { useBookingsStore, useORRoomsStore, usePACUStore, useSignatoryStore } from '../stores/appStore';
+import { useAuthStore } from '../stores/authStore';
 import { getDeptName, getDeptColor, formatTime } from '../lib/utils';
 import { generateSchedulePDF } from '../lib/generateSchedulePDF';
 import Button from '../components/ui/Button';
@@ -13,7 +14,14 @@ import { DOCUMENTS_HELP } from '../lib/helpContent';
 export default function DocumentsPage() {
   const { bookings } = useBookingsStore();
   const { rooms } = useORRoomsStore();
+  const { user } = useAuthStore();
+  const { assignments, setAssignment } = usePACUStore();
+  const { config: signatory, setConfig: setSignatory } = useSignatoryStore();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [signatoryOpen, setSignatoryOpen] = useState(false);
+
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
+  const pacuNames = assignments[selectedDate] || '';
 
   const last7Days = eachDayOfInterval({
     start: subDays(new Date(), 6),
@@ -31,7 +39,8 @@ export default function DocumentsPage() {
       });
 
   const handleDownloadPDF = async (date: string) => {
-    await generateSchedulePDF(date, bookings, rooms);
+    const pacu = assignments[date] || '';
+    await generateSchedulePDF(date, bookings, rooms, pacu, signatory);
   };
 
   const dayBookings = getBookingsForDate(selectedDate);
@@ -119,6 +128,65 @@ export default function DocumentsPage() {
 
         {/* Schedule preview */}
         <div className="lg:col-span-3 space-y-3 md:space-y-4">
+          {/* PACU Resident Input — admin only */}
+          {isAdmin && (
+            <div className="bg-amber-50 border border-amber-200 rounded-[10px] p-3 md:p-4">
+              <label className="flex items-center gap-2 text-sm font-semibold text-amber-800 mb-2">
+                <Users className="w-4 h-4" />
+                PACU — Assigned Anesthesia Residents
+              </label>
+              <input
+                type="text"
+                value={pacuNames}
+                onChange={(e) => setAssignment(selectedDate, e.target.value)}
+                placeholder="e.g. Sarmiento/Montesa/Castillo"
+                className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-2 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300 transition-colors"
+              />
+              <p className="text-[10px] text-amber-600 mt-1.5">These names will appear at the bottom of the PDF schedule.</p>
+            </div>
+          )}
+
+          {/* Signatory Settings — admin only */}
+          {isAdmin && (
+            <div className="bg-white border border-gray-200 rounded-[10px] overflow-hidden">
+              <button
+                onClick={() => setSignatoryOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-gray-500" />
+                  PDF Signatory Names
+                </span>
+                {signatoryOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+              </button>
+              {signatoryOpen && (
+                <div className="px-3 md:px-4 pb-4 pt-1 space-y-3 border-t border-gray-100">
+                  <p className="text-[11px] text-gray-400">These names appear in the signatory block at the bottom of the PDF. Changes are saved automatically.</p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">OR Supervisor</label>
+                    <input
+                      type="text"
+                      value={signatory.orSupervisor}
+                      onChange={(e) => setSignatory({ orSupervisor: e.target.value })}
+                      placeholder="e.g. Asuncion DG. Nablo, MAN"
+                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-accent-300 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Head, Department of Anesthesiology</label>
+                    <input
+                      type="text"
+                      value={signatory.deptHead}
+                      onChange={(e) => setSignatory({ deptHead: e.target.value })}
+                      placeholder="e.g. Divina V. Gomez, M.D., DPBA"
+                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-accent-300 transition-colors"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Download actions — horizontal scroll on mobile */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <Button size="sm" icon={<FileText className="w-4 h-4" />} onClick={() => handleDownloadPDF(selectedDate)}>PDF</Button>

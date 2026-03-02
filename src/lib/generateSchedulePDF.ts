@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import type { Booking, ORRoom } from './types';
 import { formatTime } from './utils';
+import type { SignatoryConfig } from '../stores/appStore';
 
 /**
  * Loads an image from a URL and returns its base64 data URL.
@@ -31,11 +32,16 @@ function loadImage(url: string): Promise<string> {
  *
  * Columns: Room | Time | Name of Patient / Age / Sex / Category | Ward No. |
  *          Operation | Anesthesiologist | Surgeon | Scrub Nurse | CN/NA
+ *
+ * Bookings are grouped by room (with room cell spanning multiple rows).
+ * Optional PACU resident names are printed below the table.
  */
 export async function generateSchedulePDF(
   dateStr: string,
   bookings: Booking[],
   rooms: ORRoom[],
+  pacuNames?: string,
+  signatory?: SignatoryConfig,
 ) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'legal' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -98,23 +104,77 @@ export async function generateSchedulePDF(
       return a.start_time.localeCompare(b.start_time);
     });
 
-  // ── Build table data ──
-  const tableBody = dayBookings.map(b => {
-    const room = rooms.find(r => r.id === b.or_room_id);
+  // ── Group bookings by room (preserving room order) ──
+  const roomOrder: string[] = [];
+  const bookingsByRoom = new Map<string, Booking[]>();
+  dayBookings.forEach(b => {
+    if (!bookingsByRoom.has(b.or_room_id)) {
+      roomOrder.push(b.or_room_id);
+      bookingsByRoom.set(b.or_room_id, []);
+    }
+    bookingsByRoom.get(b.or_room_id)!.push(b);
+  });
+
+  // Track which body row indices start a new room group (for thicker separator lines)
+  const roomGroupStartRows = new Set<number>();
+  let currentRow = 0;
+
+  // ── Build table data with room grouping (rowSpan) ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tableBody: any[][] = [];
+
+  roomOrder.forEach(roomId => {
+    const roomBookings = bookingsByRoom.get(roomId)!;
+    const room = rooms.find(r => r.id === roomId);
     const roomLabel = room ? `Rm ${room.number}` : '';
-    const timeLabel = `${formatTime(b.start_time)}`;
-    const patientInfo = `${b.patient_name}\n${b.patient_age} ${b.patient_sex} ${b.patient_category}`;
-    return [
-      roomLabel,
-      timeLabel,
-      patientInfo,
-      b.ward,
-      b.procedure,
-      b.anesthesiologist,
-      b.surgeon,
-      b.scrub_nurse || '',
-      b.circulating_nurse || '',
-    ];
+
+    roomGroupStartRows.add(currentRow);
+
+    roomBookings.forEach((b, idx) => {
+      const timeLabel = formatTime(b.start_time);
+      const patientInfo = `${b.patient_name}\n${b.patient_age} ${b.patient_sex} ${b.patient_category}`;
+
+      if (idx === 0 && roomBookings.length > 1) {
+        // First row of a multi-booking room group — room cell spans all rows
+        tableBody.push([
+          { content: roomLabel, rowSpan: roomBookings.length, styles: { valign: 'middle', halign: 'center', fontStyle: 'bold' } },
+          timeLabel,
+          patientInfo,
+          b.ward,
+          b.procedure,
+          b.anesthesiologist,
+          b.surgeon,
+          b.scrub_nurse || '',
+          b.circulating_nurse || '',
+        ]);
+      } else if (idx === 0) {
+        // Single booking in room — normal row
+        tableBody.push([
+          { content: roomLabel, styles: { halign: 'center', fontStyle: 'bold' } },
+          timeLabel,
+          patientInfo,
+          b.ward,
+          b.procedure,
+          b.anesthesiologist,
+          b.surgeon,
+          b.scrub_nurse || '',
+          b.circulating_nurse || '',
+        ]);
+      } else {
+        // Subsequent rows in a multi-booking room group — no room cell (spanned)
+        tableBody.push([
+          timeLabel,
+          patientInfo,
+          b.ward,
+          b.procedure,
+          b.anesthesiologist,
+          b.surgeon,
+          b.scrub_nurse || '',
+          b.circulating_nurse || '',
+        ]);
+      }
+      currentRow++;
+    });
   });
 
   if (tableBody.length === 0) {
@@ -166,9 +226,9 @@ export async function generateSchedulePDF(
         8: { cellWidth: 15, halign: 'center' },   // CN/NA
       },
       didParseCell: (data) => {
-        // Alternating row styling (very light gray)
-        if (data.section === 'body' && data.row.index % 2 === 1) {
-          data.cell.styles.fillColor = [248, 248, 248];
+        // Thicker top border for rows that start a new room group (except the first group)
+        if (data.section === 'body' && roomGroupStartRows.has(data.row.index) && data.row.index !== 0) {
+          data.cell.styles.lineWidth = { top: 0.7, right: 0.3, bottom: 0.3, left: 0.3 };
         }
       },
     });
@@ -179,6 +239,42 @@ export async function generateSchedulePDF(
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.text(`Total Cases: ${dayBookings.length}`, 10, finalY + 8);
+
+  // ── PACU: Assigned Anesthesia Residents ──
+  let signatoryStartY = finalY + 16;
+  if (pacuNames && pacuNames.trim()) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`PACU: ${pacuNames.trim()}`, 10, signatoryStartY);
+    signatoryStartY += 12;
+  }
+
+  // ── Signatory block ──
+  if (signatory) {
+    const lineY = signatoryStartY + 4;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    // Ensure we don’t overflow — add new page if less than 30 mm remaining
+    const printY = lineY + 30 > pageHeight ? pageHeight - 30 : lineY;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+
+    // OR Supervisor
+    if (signatory.orSupervisor.trim()) {
+      doc.text(signatory.orSupervisor.trim(), 10, printY + 12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('OR Supervisor', 10, printY + 17);
+      doc.setFont('helvetica', 'normal');
+    }
+
+    // Head, Department of Anesthesiology
+    if (signatory.deptHead.trim()) {
+      doc.text(signatory.deptHead.trim(), 10, printY + 27);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Head, Department of Anesthesiology', 10, printY + 32);
+      doc.setFont('helvetica', 'normal');
+    }
+  }
 
   // ── Save ──
   const fileName = `OR_Schedule_${dateStr}.pdf`;

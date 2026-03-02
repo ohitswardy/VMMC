@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { Booking, ORRoom, Notification, AuditLog, BookingChangeRequest, ORRoomLiveStatus } from '../lib/types';
 import type { ORRoomStatus } from '../lib/constants';
 import { DEFAULT_OR_PRIORITY_SCHEDULE } from '../lib/constants';
@@ -18,6 +19,7 @@ interface BookingsState {
   isLoading: boolean;
   selectedDate: Date;
   selectedRoom: string | null;
+  selectedTime: string | null;
   isFormOpen: boolean;
   isChangeFormOpen: boolean;
   editingBooking: Booking | null;
@@ -29,6 +31,7 @@ interface BookingsState {
   removeBooking: (id: string) => void;
   setSelectedDate: (date: Date) => void;
   setSelectedRoom: (roomId: string | null) => void;
+  setSelectedTime: (time: string | null) => void;
   openForm: (booking?: Booking) => void;
   closeForm: () => void;
   openChangeForm: (booking: Booking) => void;
@@ -40,6 +43,7 @@ export const useBookingsStore = create<BookingsState>((set, get) => ({
   isLoading: false,
   selectedDate: new Date(),
   selectedRoom: null,
+  selectedTime: null,
   isFormOpen: false,
   isChangeFormOpen: false,
   editingBooking: null,
@@ -82,8 +86,9 @@ export const useBookingsStore = create<BookingsState>((set, get) => ({
   removeBooking: (id) => set((s) => ({ bookings: s.bookings.filter((b) => b.id !== id) })),
   setSelectedDate: (date) => set({ selectedDate: date }),
   setSelectedRoom: (roomId) => set({ selectedRoom: roomId }),
+  setSelectedTime: (time) => set({ selectedTime: time }),
   openForm: (booking) => set({ isFormOpen: true, editingBooking: booking || null }),
-  closeForm: () => set({ isFormOpen: false, editingBooking: null }),
+  closeForm: () => set({ isFormOpen: false, editingBooking: null, selectedTime: null }),
   openChangeForm: (booking) => set({ isChangeFormOpen: true, changeBooking: booking }),
   closeChangeForm: () => set({ isChangeFormOpen: false, changeBooking: null }),
 }));
@@ -275,7 +280,7 @@ interface ChangeRequestsState {
   updateRequest: (id: string, updates: Partial<BookingChangeRequest>) => Promise<void>;
 }
 
-export const useChangeRequestsStore = create<ChangeRequestsState>((set) => ({
+export const useChangeRequestsStore = create<ChangeRequestsState>((set, get) => ({
   requests: [],
   isLoading: false,
 
@@ -299,10 +304,18 @@ export const useChangeRequestsStore = create<ChangeRequestsState>((set) => ({
   },
 
   updateRequest: async (id, updates) => {
+    // Snapshot for rollback
+    const prev = get().requests;
     set((s) => ({
       requests: s.requests.map((r) => (r.id === id ? { ...r, ...updates } : r)),
     }));
-    await updateChangeRequest(id, updates);
+    try {
+      await updateChangeRequest(id, updates);
+    } catch (err) {
+      // Rollback optimistic update
+      set({ requests: prev });
+      throw err;
+    }
   },
 }));
 
@@ -349,3 +362,47 @@ export const useORPriorityScheduleStore = create<ORPriorityScheduleState>((set) 
 
   setSchedule: (schedule) => set({ schedule }),
 }));
+
+// ── PACU Assignments Store ──
+// Stores per-date PACU resident names (persisted to localStorage)
+interface PACUAssignmentsState {
+  assignments: Record<string, string>; // date (YYYY-MM-DD) → names string
+  setAssignment: (date: string, names: string) => void;
+}
+
+export const usePACUStore = create<PACUAssignmentsState>()(
+  persist(
+    (set) => ({
+      assignments: {},
+      setAssignment: (date, names) =>
+        set((s) => ({ assignments: { ...s.assignments, [date]: names } })),
+    }),
+    { name: 'vmmc-pacu-assignments' }
+  )
+);
+
+// ── Signatory Store ──
+// Persists the configurable signatory names for the PDF footer.
+export interface SignatoryConfig {
+  orSupervisor: string;
+  deptHead: string;
+}
+
+interface SignatoryState {
+  config: SignatoryConfig;
+  setConfig: (updates: Partial<SignatoryConfig>) => void;
+}
+
+export const useSignatoryStore = create<SignatoryState>()(
+  persist(
+    (set) => ({
+      config: {
+        orSupervisor: 'Asuncion DG. Nablo, MAN',
+        deptHead: 'Divina V. Gomez, M.D., DPBA',
+      },
+      setConfig: (updates) =>
+        set((s) => ({ config: { ...s.config, ...updates } })),
+    }),
+    { name: 'vmmc-signatory-config' }
+  )
+);

@@ -276,7 +276,7 @@ function BookingCard({
 export default function BookingsPage() {
   const { user } = useAuthStore();
   const { isChangeFormOpen, changeBooking, closeChangeForm } = useBookingsStore();
-  const { bookings, updateBooking } = useBookingsStore();
+  const { bookings, updateBooking, loadBookings } = useBookingsStore();
   const { rooms } = useORRoomsStore();
   const { requests, loadRequests, updateRequest } = useChangeRequestsStore();
   const [search, setSearch] = useState('');
@@ -311,21 +311,77 @@ export default function BookingsPage() {
     if (!booking) { toast.error('Original booking not found.'); return; }
 
     setCrActionLoading(requestId);
-    await updateRequest(requestId, {
-      status: 'approved',
-      reviewed_by: user?.id,
-    });
-    // Apply the schedule change to the original booking
-    await updateBooking(booking.id, {
-      date: req.new_date,
-      start_time: req.new_preferred_time,
-      status: 'approved',
-      updated_at: new Date().toISOString(),
-    });
-    notifyChangeRequestApproved(booking, req.created_by, user?.full_name || 'Admin', req.new_date, req.new_preferred_time);
-    if (user) auditChangeRequestReview(user.id, requestId, booking.id, 'approved');
-    toast.success('Change request approved and booking updated.');
-    setCrActionLoading(null);
+    try {
+      // Step 1: mark the change request as approved
+      await updateRequest(requestId, {
+        status: 'approved',
+        reviewed_by: user?.id,
+      });
+
+      // Step 2: apply ALL requested changes to the original booking.
+      // Preserve the original duration so end_time stays consistent.
+      const [origStartH, origStartM] = booking.start_time.split(':').map(Number);
+      const [origEndH, origEndM] = booking.end_time.split(':').map(Number);
+      const durationMin = (origEndH * 60 + origEndM) - (origStartH * 60 + origStartM);
+      const [newStartH, newStartM] = req.new_preferred_time.split(':').map(Number);
+      const newEndTotalMin = newStartH * 60 + newStartM + (durationMin > 0 ? durationMin : 60);
+      const newEndH = Math.floor(newEndTotalMin / 60) % 24;
+      const newEndM = newEndTotalMin % 60;
+      const newEndTime = `${String(newEndH).padStart(2, '0')}:${String(newEndM).padStart(2, '0')}`;
+
+      // Build the update payload with every field from the change request
+      const bookingUpdates: Partial<Booking> = {
+        date: req.new_date,
+        start_time: req.new_preferred_time,
+        end_time: newEndTime,
+        department_id: req.department_id,
+        status: booking.status === 'pending' ? 'approved' : booking.status,
+      };
+
+      // Apply procedure change
+      if (req.procedure) {
+        bookingUpdates.procedure = req.procedure;
+      }
+
+      // Apply anesthesiologist change
+      if (req.preferred_anesthesiologist) {
+        bookingUpdates.anesthesiologist = req.preferred_anesthesiologist;
+      }
+
+      // Parse patient_details back into individual fields.
+      // Format: "Name Age/Sex/Category Ward WardName"
+      if (req.patient_details) {
+        const detailStr = req.patient_details.trim();
+        const wardIdx = detailStr.lastIndexOf(' Ward ');
+        if (wardIdx !== -1) {
+          const beforeWard = detailStr.substring(0, wardIdx).trim();
+          const wardValue = detailStr.substring(wardIdx + 6).trim();
+          // Find the last token that matches "age/sex/category"
+          const slashMatch = beforeWard.match(/^(.+?)\s+(\d+)\/(M|F)\/(.*?)$/i);
+          if (slashMatch) {
+            bookingUpdates.patient_name = slashMatch[1].trim();
+            bookingUpdates.patient_age = parseInt(slashMatch[2], 10);
+            bookingUpdates.patient_sex = slashMatch[3].toUpperCase() as 'M' | 'F';
+            bookingUpdates.patient_category = slashMatch[4].trim() as Booking['patient_category'];
+          }
+          bookingUpdates.ward = wardValue;
+        }
+      }
+
+      await updateBooking(booking.id, bookingUpdates);
+
+      notifyChangeRequestApproved(booking, req.created_by, user?.full_name || 'Admin', req.new_date, req.new_preferred_time);
+      if (user) auditChangeRequestReview(user.id, requestId, booking.id, 'approved');
+      toast.success('Change request approved and booking updated.');
+
+      // Force re-sync so calendar and other views reflect the change immediately
+      await Promise.all([loadBookings(), loadRequests()]);
+    } catch (err) {
+      console.error('Failed to approve change request:', err);
+      toast.error('Failed to approve change request. Please try again.');
+    } finally {
+      setCrActionLoading(null);
+    }
   };
 
   const handleDenyRequest = async (requestId: string) => {
@@ -336,16 +392,23 @@ export default function BookingsPage() {
     if (!booking) { toast.error('Original booking not found.'); return; }
 
     setCrActionLoading(requestId);
-    await updateRequest(requestId, {
-      status: 'denied',
-      reviewed_by: user?.id,
-    });
-    notifyChangeRequestDenied(booking, req.created_by, user?.full_name || 'Admin', denyReasonText.trim());
-    if (user) auditChangeRequestReview(user.id, requestId, booking.id, 'denied', denyReasonText.trim());
-    toast.success('Change request denied.');
-    setDenyingRequestId(null);
-    setDenyReasonText('');
-    setCrActionLoading(null);
+    try {
+      await updateRequest(requestId, {
+        status: 'denied',
+        reviewed_by: user?.id,
+      });
+      notifyChangeRequestDenied(booking, req.created_by, user?.full_name || 'Admin', denyReasonText.trim());
+      if (user) auditChangeRequestReview(user.id, requestId, booking.id, 'denied', denyReasonText.trim());
+      toast.success('Change request denied.');
+      setDenyingRequestId(null);
+      setDenyReasonText('');
+      await loadRequests();
+    } catch (err) {
+      console.error('Failed to deny change request:', err);
+      toast.error('Failed to deny change request. Please try again.');
+    } finally {
+      setCrActionLoading(null);
+    }
   };
 
   const filtered = useMemo(() => {

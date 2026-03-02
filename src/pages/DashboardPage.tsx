@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   ClipboardList, Clock, Calendar, CheckCircle,
-  Search, ChevronRight, ArrowUpRight, ArrowDownRight
+  Search, ChevronRight, ArrowUpRight, ArrowDownRight, UserCheck, X
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line
@@ -33,13 +33,38 @@ export default function DashboardPage() {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [denyingId, setDenyingId] = useState<string | null>(null);
 
+  // Anesthesiologist prompt state
+  const [anesPromptBookingId, setAnesPromptBookingId] = useState<string | null>(null);
+  const [anesInput, setAnesInput] = useState('');
+  const [anesSubmitting, setAnesSubmitting] = useState(false);
+
   const handleApprove = async (id: string) => {
+    const booking = bookings.find((b) => b.id === id);
+    if (!booking) return;
+    if (!booking.anesthesiologist || !booking.anesthesiologist.trim()) {
+      // No anesthesiologist assigned — prompt before approving
+      setAnesInput('');
+      setAnesPromptBookingId(id);
+      return;
+    }
     setApprovingId(id);
     try {
       await updateBooking(id, { status: 'approved' });
       toast.success('Booking approved');
     } catch { toast.error('Failed to approve'); }
     finally { setApprovingId(null); }
+  };
+
+  const handleAnesPromptSubmit = async () => {
+    if (!anesPromptBookingId) return;
+    if (!anesInput.trim()) { toast.error('Please enter an anesthesiologist name.'); return; }
+    setAnesSubmitting(true);
+    try {
+      await updateBooking(anesPromptBookingId, { anesthesiologist: anesInput.trim(), status: 'approved' });
+      toast.success('Booking approved');
+      setAnesPromptBookingId(null);
+    } catch { toast.error('Failed to approve'); }
+    finally { setAnesSubmitting(false); }
   };
 
   const handleDeny = async (id: string) => {
@@ -82,6 +107,61 @@ export default function DashboardPage() {
 
   return (
     <div className="page-container">
+
+      {/* Anesthesiologist Prompt Modal */}
+      {anesPromptBookingId && (() => {
+        const b = bookings.find((bk) => bk.id === anesPromptBookingId);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.18 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-accent-50 flex items-center justify-center shrink-0">
+                    <UserCheck className="w-5 h-5 text-accent-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-gray-900">Assign Anesthesiologist</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Required before approving this case</p>
+                  </div>
+                </div>
+                <button onClick={() => setAnesPromptBookingId(null)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+
+              {b && (
+                <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-lg text-sm">
+                  <p className="font-medium text-gray-800 truncate">{b.procedure}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{b.patient_name} · {getDeptName(b.department_id)} · {b.date}</p>
+                </div>
+              )}
+
+              <div className="mb-5">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Anesthesiologist Name</label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={anesInput}
+                  onChange={(e) => setAnesInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAnesPromptSubmit()}
+                  placeholder="e.g. Dr. Juan Dela Cruz"
+                  className="w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-accent-300 transition-colors"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="secondary" className="flex-1" onClick={() => setAnesPromptBookingId(null)}>Cancel</Button>
+                <Button variant="accent" className="flex-1" loading={anesSubmitting} onClick={handleAnesPromptSubmit}>Approve</Button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="page-header">
