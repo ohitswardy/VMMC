@@ -18,6 +18,8 @@ import Button from '../components/ui/Button';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import PageHelpButton from '../components/ui/PageHelpButton';
 import { DASHBOARD_HELP } from '../lib/helpContent';
+import BookingDetailModal from '../components/booking/BookingDetailModal';
+import type { Booking } from '../lib/types';
 
 const fadeUp = {
   initial: { opacity: 0, y: 12 },
@@ -78,6 +80,7 @@ export default function DashboardPage() {
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
 
@@ -323,7 +326,7 @@ export default function DashboardPage() {
                   hour: 'numeric', minute: '2-digit',
                 });
                 return (
-                <div key={b.id} className="px-4 md:px-5 py-3.5 hover:bg-gray-50 active:bg-gray-50 transition-colors">
+                <div key={b.id} className="px-4 md:px-5 py-3.5 hover:bg-gray-50 active:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedBooking(b)}>
                   <div className="flex items-start gap-3">
                     <div className="w-1 h-10 md:h-8 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: getDeptColor(b.department_id) }} />
                     <div className="flex-1 min-w-0">
@@ -340,7 +343,7 @@ export default function DashboardPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       <Button variant="accent" size="sm" loading={approvingId === b.id} onClick={() => handleApprove(b.id)}>Approve</Button>
                       <Button variant="outline" size="sm" loading={denyingId === b.id} onClick={() => handleDeny(b.id)}>Deny</Button>
                     </div>
@@ -396,7 +399,7 @@ export default function DashboardPage() {
                 hour: 'numeric', minute: '2-digit',
               });
               return (
-                <div key={b.id} className="px-4 py-3.5 active:bg-gray-50 transition-colors">
+                <div key={b.id} className="px-4 py-3.5 hover:bg-gray-50 active:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedBooking(b)}>
                   <div className="flex items-start gap-3">
                     <div className="w-1 rounded-full self-stretch flex-shrink-0" style={{ backgroundColor: getDeptColor(b.department_id) }} />
                     <div className="flex-1 min-w-0">
@@ -441,7 +444,7 @@ export default function DashboardPage() {
                     hour: 'numeric', minute: '2-digit',
                   });
                   return (
-                    <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={b.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedBooking(b)}>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getDeptColor(b.department_id) }} />
@@ -469,6 +472,16 @@ export default function DashboardPage() {
           )}
         </div>
       </motion.div>
+
+      {/* Booking detail modal */}
+      {selectedBooking && (
+        <BookingDetailModal
+          isOpen={!!selectedBooking}
+          onClose={() => setSelectedBooking(null)}
+          booking={selectedBooking}
+          rooms={rooms}
+        />
+      )}
     </div>
   );
 }

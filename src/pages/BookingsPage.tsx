@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronLeft, ChevronRight, CalendarDays, Clock, ChevronDown, CalendarRange, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, CalendarDays, Clock, ChevronDown, CalendarRange, FileText, CheckCircle, XCircle, X, AlertCircle, ArrowRight, User, Stethoscope, Building2 } from 'lucide-react';
 import {
   format, addDays, subDays, isToday, addMonths, subMonths,
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
@@ -25,7 +25,7 @@ import {
 import {
   auditChangeRequestReview,
 } from '../lib/auditHelper';
-import type { Booking, ORRoom } from '../lib/types';
+import type { Booking, ORRoom, BookingChangeRequest } from '../lib/types';
 
 const fadeUp = {
   initial: { opacity: 0, y: 10 },
@@ -289,6 +289,13 @@ export default function BookingsPage() {
   const [denyingRequestId, setDenyingRequestId] = useState<string | null>(null);
   const [denyReasonText, setDenyReasonText] = useState('');
   const [crActionLoading, setCrActionLoading] = useState<string | null>(null);
+  const [showPendingPanel, setShowPendingPanel] = useState(false);
+  const [panelApprovingId, setPanelApprovingId] = useState<string | null>(null);
+  const [panelDenyingId, setPanelDenyingId] = useState<string | null>(null);
+  const [selectedChangeRequest, setSelectedChangeRequest] = useState<BookingChangeRequest | null>(null);
+  const [crModalDenying, setCrModalDenying] = useState(false);
+  const [crModalDenyReason, setCrModalDenyReason] = useState('');
+  const [showMyBookingsPanel, setShowMyBookingsPanel] = useState(false);
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
   const dateStr = format(currentDate, 'yyyy-MM-dd');
@@ -303,6 +310,37 @@ export default function BookingsPage() {
     () => requests.filter((r) => r.status === 'pending'),
     [requests]
   );
+
+  const allPendingBookings = useMemo(
+    () => [...bookings.filter((b) => b.status === 'pending')]
+      .sort((a, b) => new Date(a.date + 'T' + a.start_time).getTime() - new Date(b.date + 'T' + b.start_time).getTime()),
+    [bookings]
+  );
+
+  // All bookings for this department (incl. those submitted by Anes on their behalf)
+  const myAllBookings = useMemo(() => {
+    if (isAdmin || !user?.department_id) return [];
+    return [...bookings.filter((b) => b.department_id === user.department_id)]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [bookings, isAdmin, user]);
+
+  const handlePanelApprove = async (id: string) => {
+    setPanelApprovingId(id);
+    try {
+      await updateBooking(id, { status: 'approved' });
+      toast.success('Booking approved');
+    } catch { toast.error('Failed to approve'); }
+    finally { setPanelApprovingId(null); }
+  };
+
+  const handlePanelDeny = async (id: string) => {
+    setPanelDenyingId(id);
+    try {
+      await updateBooking(id, { status: 'denied' });
+      toast.success('Booking denied');
+    } catch { toast.error('Failed to deny'); }
+    finally { setPanelDenyingId(null); }
+  };
 
   const handleApproveRequest = async (requestId: string) => {
     const req = requests.find((r) => r.id === requestId);
@@ -470,8 +508,493 @@ export default function BookingsPage() {
   const goTo = (dir: 'prev' | 'next') =>
     setCurrentDate((d) => (dir === 'next' ? addDays(d, 1) : subDays(d, 1)));
 
+  // ── Change Request Detail Modal ──
+  const crModalBooking = selectedChangeRequest
+    ? bookings.find((b) => b.id === selectedChangeRequest.original_booking_id) ?? null
+    : null;
+
   return (
     <div className="page-container">
+
+      {/* ── Change Request Detail Modal ── */}
+      <AnimatePresence>
+        {selectedChangeRequest && (
+          <motion.div
+            key="cr-modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+            onClick={() => { setSelectedChangeRequest(null); setCrModalDenying(false); setCrModalDenyReason(''); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ duration: 0.18 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-[15px] font-semibold text-gray-900">Change Request Details</h2>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Submitted {format(new Date(selectedChangeRequest.created_at), 'MMM d, yyyy · h:mm a')}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setSelectedChangeRequest(null); setCrModalDenying(false); setCrModalDenyReason(''); }}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="px-6 py-5 space-y-5">
+
+                {/* ── Original Booking Info ── */}
+                {crModalBooking && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Original Booking</p>
+                    <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[15px] font-bold text-gray-900">{crModalBooking.procedure}</p>
+                          <p className="text-[13px] text-gray-500 mt-0.5">{crModalBooking.patient_name} · {crModalBooking.patient_age}/{crModalBooking.patient_sex}</p>
+                        </div>
+                        <StatusBadge status={crModalBooking.status} size="sm" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="text-gray-500">Schedule:</span>
+                          <span className="font-medium text-gray-800">{crModalBooking.date} · {formatTime(crModalBooking.start_time)}–{formatTime(crModalBooking.end_time)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="text-gray-500">Dept:</span>
+                          <span className="font-medium" style={{ color: getDeptColor(crModalBooking.department_id) }}>{getDeptName(crModalBooking.department_id)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <User className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="text-gray-500">Surgeon:</span>
+                          <span className="font-medium text-gray-800">{crModalBooking.surgeon}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Stethoscope className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="text-gray-500">Anesthesiologist:</span>
+                          <span className="font-medium text-gray-800">{crModalBooking.anesthesiologist || 'Not assigned'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">Ward:</span>
+                          <span className="font-medium text-gray-800">{crModalBooking.ward || '—'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">Room:</span>
+                          <span className="font-medium text-gray-800">{rooms.find((r) => r.id === crModalBooking.or_room_id)?.name || '—'}</span>
+                        </div>
+                      </div>
+                      {crModalBooking.notes && (
+                        <p className="text-[12px] text-gray-500 italic border-t border-gray-200 pt-2">Notes: {crModalBooking.notes}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Requested Changes ── */}
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Requested Changes</p>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-3">
+                    {/* Schedule change */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[12px] font-medium text-gray-500 w-24 shrink-0">Schedule</span>
+                      <span className="text-[13px] text-gray-500 line-through">
+                        {crModalBooking ? `${crModalBooking.date} · ${formatTime(crModalBooking.start_time)}` : '—'}
+                      </span>
+                      <ArrowRight className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <span className="text-[13px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
+                        {selectedChangeRequest.new_date} · {formatTime(selectedChangeRequest.new_preferred_time)}
+                      </span>
+                    </div>
+
+                    {/* Department change */}
+                    {selectedChangeRequest.department_id !== crModalBooking?.department_id && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[12px] font-medium text-gray-500 w-24 shrink-0">Department</span>
+                        <span className="text-[13px] text-gray-500 line-through">{crModalBooking ? getDeptName(crModalBooking.department_id) : '—'}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span className="text-[13px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">{getDeptName(selectedChangeRequest.department_id)}</span>
+                      </div>
+                    )}
+
+                    {/* Procedure change */}
+                    {selectedChangeRequest.procedure && selectedChangeRequest.procedure !== crModalBooking?.procedure && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[12px] font-medium text-gray-500 w-24 shrink-0">Procedure</span>
+                        <span className="text-[13px] text-gray-500 line-through">{crModalBooking?.procedure}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span className="text-[13px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">{selectedChangeRequest.procedure}</span>
+                      </div>
+                    )}
+
+                    {/* Anesthesiologist change */}
+                    {selectedChangeRequest.preferred_anesthesiologist && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[12px] font-medium text-gray-500 w-24 shrink-0">Anesthesiologist</span>
+                        <span className="text-[13px] text-gray-500 line-through">{crModalBooking?.anesthesiologist || 'Not assigned'}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span className="text-[13px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">{selectedChangeRequest.preferred_anesthesiologist}</span>
+                      </div>
+                    )}
+
+                    {/* Patient details */}
+                    {selectedChangeRequest.patient_details && (
+                      <div className="flex items-start gap-2 flex-wrap">
+                        <span className="text-[12px] font-medium text-gray-500 w-24 shrink-0">Patient</span>
+                        <span className="text-[13px] text-gray-700">{selectedChangeRequest.patient_details}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Reason ── */}
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Reason for Change</p>
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 px-4 py-3">
+                    <p className="text-[13px] font-medium text-gray-800">{selectedChangeRequest.reason}{selectedChangeRequest.reason_other ? ` — ${selectedChangeRequest.reason_other}` : ''}</p>
+                    {selectedChangeRequest.additional_info && (
+                      <p className="text-[12px] text-gray-500 mt-1.5">{selectedChangeRequest.additional_info}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Deny input ── */}
+                {crModalDenying && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Denial Reason</p>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={crModalDenyReason}
+                      onChange={(e) => setCrModalDenyReason(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Escape' && setCrModalDenying(false)}
+                      placeholder="Enter reason for denial..."
+                      className="w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-300 transition-colors"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer ─ Actions */}
+              <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
+                {crModalDenying ? (
+                  <>
+                    <button
+                      onClick={() => { setCrModalDenying(false); setCrModalDenyReason(''); }}
+                      className="px-4 py-2 rounded-lg text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!crModalDenyReason.trim()) { toast.error('Enter a denial reason.'); return; }
+                        setDenyReasonText(crModalDenyReason);
+                        // temporarily set denyReasonText and call handler
+                        const req = selectedChangeRequest;
+                        const bk = bookings.find((b) => b.id === req.original_booking_id);
+                        if (!bk) { toast.error('Original booking not found.'); return; }
+                        setCrActionLoading(req.id);
+                        try {
+                          await updateRequest(req.id, { status: 'denied', reviewed_by: user?.id });
+                          notifyChangeRequestDenied(bk, req.created_by, user?.full_name || 'Admin', crModalDenyReason.trim());
+                          if (user) auditChangeRequestReview(user.id, req.id, bk.id, 'denied', crModalDenyReason.trim());
+                          toast.success('Change request denied.');
+                          setSelectedChangeRequest(null);
+                          setCrModalDenying(false);
+                          setCrModalDenyReason('');
+                          await loadRequests();
+                        } catch { toast.error('Failed to deny.'); }
+                        finally { setCrActionLoading(null); }
+                      }}
+                      disabled={crActionLoading === selectedChangeRequest.id}
+                      className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                    >
+                      {crActionLoading === selectedChangeRequest.id ? 'Denying...' : 'Confirm Deny'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => { setSelectedChangeRequest(null); }}
+                      className="px-4 py-2 rounded-lg text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => setCrModalDenying(true)}
+                      disabled={crActionLoading === selectedChangeRequest.id}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold border border-red-200 text-red-600 bg-white hover:bg-red-50 disabled:opacity-50 transition-colors"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Deny
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await handleApproveRequest(selectedChangeRequest.id);
+                        setSelectedChangeRequest(null);
+                      }}
+                      disabled={crActionLoading === selectedChangeRequest.id}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      {crActionLoading === selectedChangeRequest.id ? 'Approving...' : 'Approve'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── My Bookings Slide-over Panel (dept users) ── */}
+      <AnimatePresence>
+        {showMyBookingsPanel && (
+          <>
+            <motion.div
+              key="my-bookings-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]"
+              onClick={() => setShowMyBookingsPanel(false)}
+            />
+            <motion.div
+              key="my-bookings-drawer"
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 32 }}
+              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-accent-50 flex items-center justify-center">
+                    <FileText className="w-4 h-4 text-accent-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-[15px] font-semibold text-gray-900">My Bookings</h2>
+                    <p className="text-[11px] text-gray-400">{getDeptName(user?.department_id as any)} · all dates</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full bg-accent-100 text-accent-700 text-[11px] font-bold border border-accent-200">
+                    {myAllBookings.length}
+                  </span>
+                  <button
+                    onClick={() => setShowMyBookingsPanel(false)}
+                    className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+                {myAllBookings.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center">
+                      <FileText className="w-6 h-6 text-gray-300" />
+                    </div>
+                    <p className="text-sm text-gray-400">No bookings yet.</p>
+                  </div>
+                ) : (
+                  myAllBookings.map((b) => {
+                    const room = rooms.find((r) => r.id === b.or_room_id);
+                    const submittedAt = new Date(b.created_at).toLocaleString(undefined, {
+                      month: 'short', day: 'numeric', year: 'numeric',
+                      hour: 'numeric', minute: '2-digit',
+                    });
+                    return (
+                      <div
+                        key={b.id}
+                        className="px-5 py-4 hover:bg-gray-50/60 transition-colors cursor-pointer"
+                        onClick={() => { setShowMyBookingsPanel(false); setSelectedBooking(b); }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="w-1 rounded-full self-stretch flex-shrink-0"
+                            style={{ backgroundColor: getDeptColor(b.department_id) }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-0.5">
+                              <p className="text-[14px] font-semibold text-gray-900 truncate">{b.procedure}</p>
+                              <StatusBadge status={b.status} size="sm" />
+                            </div>
+                            <p className="text-[13px] text-gray-600">{b.patient_name} · {b.patient_age}/{b.patient_sex}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {room?.name || 'No room assigned'} · Ward {b.ward || '—'}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {b.date} · {formatTime(b.start_time)}–{formatTime(b.end_time)}
+                            </p>
+                            {b.is_emergency && (
+                              <span className="inline-block mt-1 text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-md">🚨 Emergency</span>
+                            )}
+                            <p className="text-[11px] text-gray-400 mt-1">Submitted {submittedAt}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Pending Cases Slide-over Panel ── */}
+      <AnimatePresence>
+        {showPendingPanel && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="pending-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]"
+              onClick={() => setShowPendingPanel(false)}
+            />
+            {/* Drawer */}
+            <motion.div
+              key="pending-drawer"
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 32 }}
+              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col"
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-[15px] font-semibold text-gray-900">Pending Cases</h2>
+                    <p className="text-[11px] text-gray-400">All unreviewed bookings</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold border border-amber-200">
+                    {allPendingBookings.length}
+                  </span>
+                  <button
+                    onClick={() => setShowPendingPanel(false)}
+                    className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Drawer Body */}
+              <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+                {allPendingBookings.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
+                      <CheckCircle className="w-6 h-6 text-emerald-500" />
+                    </div>
+                    <p className="text-sm text-gray-400">All caught up! No pending cases.</p>
+                  </div>
+                ) : (
+                  allPendingBookings.map((b) => {
+                    const room = rooms.find((r) => r.id === b.or_room_id);
+                    const submittedAt = new Date(b.created_at).toLocaleString(undefined, {
+                      month: 'short', day: 'numeric', year: 'numeric',
+                      hour: 'numeric', minute: '2-digit',
+                    });
+                    const isApproving = panelApprovingId === b.id;
+                    const isDenying = panelDenyingId === b.id;
+                    return (
+                      <div key={b.id} className="px-5 py-4 hover:bg-gray-50/60 transition-colors">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="w-1 rounded-full self-stretch flex-shrink-0"
+                            style={{ backgroundColor: getDeptColor(b.department_id) }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-0.5">
+                              <p className="text-[14px] font-semibold text-gray-900 truncate">{b.procedure}</p>
+                              {b.is_emergency && (
+                                <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-md shrink-0">🚨 EMRG</span>
+                              )}
+                            </div>
+                            <p className="text-[13px] text-gray-600">{b.patient_name} · {b.patient_age}/{b.patient_sex}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {getDeptName(b.department_id)} · {room?.name || 'No room'}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {b.date} · {formatTime(b.start_time)}–{formatTime(b.end_time)}
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-0.5">Submitted {submittedAt}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-3 ml-4">
+                          <button
+                            onClick={() => { setShowPendingPanel(false); setSelectedBooking(b); }}
+                            className="flex-1 py-1.5 rounded-lg text-[12px] font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+                          >
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => handlePanelApprove(b.id)}
+                            disabled={isApproving || isDenying}
+                            className="flex-1 py-1.5 rounded-lg text-[12px] font-semibold bg-accent-600 text-white hover:bg-accent-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                          >
+                            {isApproving ? (
+                              <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-3.5 h-3.5" />
+                            )}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handlePanelDeny(b.id)}
+                            disabled={isApproving || isDenying}
+                            className="flex-1 py-1.5 rounded-lg text-[12px] font-semibold border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                          >
+                            {isDenying ? (
+                              <span className="inline-block w-3.5 h-3.5 border-2 border-red-300/40 border-t-red-500 rounded-full animate-spin" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5" />
+                            )}
+                            Deny
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="flex items-start gap-3">
@@ -563,7 +1086,11 @@ export default function BookingsPage() {
                 const booking = bookings.find((b) => b.id === req.original_booking_id);
                 const isDenying = denyingRequestId === req.id;
                 return (
-                  <div key={req.id} className="bg-white rounded-lg border border-amber-100 p-3 space-y-2">
+                  <div
+                    key={req.id}
+                    className="bg-white rounded-lg border border-amber-100 p-3 space-y-2 cursor-pointer hover:border-amber-300 hover:bg-amber-50/30 transition-colors"
+                    onClick={() => { setSelectedChangeRequest(req); setCrModalDenying(false); setCrModalDenyReason(''); }}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[13px] font-semibold text-gray-900">{req.procedure}</p>
@@ -580,10 +1107,14 @@ export default function BookingsPage() {
                           </p>
                         )}
                       </div>
-                      <span className="text-[11px] text-gray-400 flex-shrink-0">
-                        {format(new Date(req.created_at), 'MMM d, h:mm a')}
-                      </span>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span className="text-[11px] text-gray-400">
+                          {format(new Date(req.created_at), 'MMM d, h:mm a')}
+                        </span>
+                        <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">View details →</span>
+                      </div>
                     </div>
+                    <div onClick={(e) => e.stopPropagation()}>
                     {isDenying ? (
                       <div className="flex items-center gap-2">
                         <input
@@ -628,6 +1159,7 @@ export default function BookingsPage() {
                         </button>
                       </div>
                     )}
+                    </div>
                   </div>
                 );
               })}
@@ -670,6 +1202,34 @@ export default function BookingsPage() {
             ]}
             className="shrink-0"
           />
+          {isAdmin && (
+            <button
+              onClick={() => setShowPendingPanel(true)}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[12px] font-semibold hover:bg-amber-100 active:bg-amber-200 transition-colors shrink-0"
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              Pending Cases
+              {allPendingBookings.length > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                  {allPendingBookings.length}
+                </span>
+              )}
+            </button>
+          )}
+          {!isAdmin && user?.department_id && (
+            <button
+              onClick={() => setShowMyBookingsPanel(true)}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-50 border border-accent-200 text-accent-700 text-[12px] font-semibold hover:bg-accent-100 active:bg-accent-200 transition-colors shrink-0"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              My Bookings
+              {myAllBookings.length > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-accent-600 text-white text-[10px] font-bold">
+                  {myAllBookings.length > 99 ? '99+' : myAllBookings.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
