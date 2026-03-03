@@ -89,8 +89,7 @@ export const PRIVACY_POLICY_SECTIONS = [
       'For questions, concerns, or requests regarding this Data Privacy Policy and User Agreement, please contact:\n\n' +
       'VMMC Data Privacy Officer\n' +
       'Veterans Memorial Medical Center\n' +
-      'North Avenue, Diliman, Quezon City\n' +
-      'Email: dpo@vmmc.gov.ph',
+      'North Avenue, Diliman, Quezon City\n',
   },
 ] as const;
 
