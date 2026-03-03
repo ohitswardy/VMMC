@@ -17,6 +17,7 @@ import { useBookingsStore, useChangeRequestsStore } from '../stores/appStore';
 import BookingDetailModal from '../components/booking/BookingDetailModal';
 import ChangeScheduleModal from '../components/booking/ChangeScheduleModal';
 import PageHelpButton from '../components/ui/PageHelpButton';
+import PageLoader from '../components/ui/PageLoader';
 import { BOOKINGS_HELP } from '../lib/helpContent';
 import {
   notifyChangeRequestApproved,
@@ -276,7 +277,7 @@ function BookingCard({
 export default function BookingsPage() {
   const { user } = useAuthStore();
   const { isChangeFormOpen, changeBooking, closeChangeForm } = useBookingsStore();
-  const { bookings, updateBooking, loadBookings } = useBookingsStore();
+  const { bookings, updateBooking, loadBookings, isLoading: bookingsLoading } = useBookingsStore();
   const { rooms } = useORRoomsStore();
   const { requests, loadRequests, updateRequest } = useChangeRequestsStore();
   const [search, setSearch] = useState('');
@@ -520,6 +521,10 @@ export default function BookingsPage() {
   const crModalBooking = selectedChangeRequest
     ? bookings.find((b) => b.id === selectedChangeRequest.original_booking_id) ?? null
     : null;
+
+  if (bookingsLoading && bookings.length === 0) {
+    return <PageLoader label="Loading bookings…" />;
+  }
 
   return (
     <div className="page-container">

@@ -4,14 +4,14 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    'Supabase credentials not set. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env'
+  throw new Error(
+    'Missing Supabase credentials. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.'
   );
 }
 
 export const supabase = createClient(
-  supabaseUrl || 'https://chfiefxeschdmnihsvvb.supabase.co',
-  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZmllZnhlc2NoZG1uaWhzdnZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjU0NTgsImV4cCI6MjA4NzY0MTQ1OH0.adyo3GBkW9sV-iwdDuKzWRL0HqRzVNjjsx6HoPaduOw',
+  supabaseUrl,
+  supabaseAnonKey,
   {
     db: { schema: 'public' },
     auth: {

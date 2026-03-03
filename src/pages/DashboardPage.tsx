@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   ClipboardList, Clock, Calendar, CheckCircle,
-  Search, ChevronRight, ArrowUpRight, ArrowDownRight, UserCheck, X
+  Search, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, UserCheck, X
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line
@@ -13,8 +13,11 @@ import { useAuthStore } from '../stores/authStore';
 import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { BOOKING_STATUSES } from '../lib/constants';
 import { getDeptColor, getDeptBg, getDeptName, formatTime } from '../lib/utils';
+import { notifyBookingApproved, notifyBookingDenied } from '../lib/notificationHelper';
+import { auditBookingApprove, auditBookingDeny } from '../lib/auditHelper';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
+import PageLoader from '../components/ui/PageLoader';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import PageHelpButton from '../components/ui/PageHelpButton';
 import { DASHBOARD_HELP } from '../lib/helpContent';
@@ -29,16 +32,20 @@ const fadeUp = {
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
-  const { bookings, updateBooking } = useBookingsStore();
-  const { rooms } = useORRoomsStore();
+  const { bookings, updateBooking, isLoading: bookingsLoading } = useBookingsStore();
+  const { rooms, isLoading: roomsLoading } = useORRoomsStore();
 
   const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [denyingId, setDenyingId] = useState<string | null>(null);
 
   // Anesthesiologist prompt state
   const [anesPromptBookingId, setAnesPromptBookingId] = useState<string | null>(null);
   const [anesInput, setAnesInput] = useState('');
   const [anesSubmitting, setAnesSubmitting] = useState(false);
+
+  // Deny reason prompt state
+  const [denyPromptBookingId, setDenyPromptBookingId] = useState<string | null>(null);
+  const [denyReasonInput, setDenyReasonInput] = useState('');
+  const [denySubmitting, setDenySubmitting] = useState(false);
 
   const handleApprove = async (id: string) => {
     const booking = bookings.find((b) => b.id === id);
@@ -51,8 +58,10 @@ export default function DashboardPage() {
     }
     setApprovingId(id);
     try {
-      await updateBooking(id, { status: 'approved' });
+      await updateBooking(id, { status: 'approved', approved_by: user?.id, updated_at: new Date().toISOString() });
       toast.success('Booking approved');
+      notifyBookingApproved(booking, user?.full_name || 'Admin');
+      if (user) auditBookingApprove(user.id, booking);
     } catch { toast.error('Failed to approve'); }
     finally { setApprovingId(null); }
   };
@@ -60,22 +69,40 @@ export default function DashboardPage() {
   const handleAnesPromptSubmit = async () => {
     if (!anesPromptBookingId) return;
     if (!anesInput.trim()) { toast.error('Please enter an anesthesiologist name.'); return; }
+    const booking = bookings.find((b) => b.id === anesPromptBookingId);
     setAnesSubmitting(true);
     try {
-      await updateBooking(anesPromptBookingId, { anesthesiologist: anesInput.trim(), status: 'approved' });
+      await updateBooking(anesPromptBookingId, { anesthesiologist: anesInput.trim(), status: 'approved', approved_by: user?.id, updated_at: new Date().toISOString() });
       toast.success('Booking approved');
+      if (booking) {
+        notifyBookingApproved(booking, user?.full_name || 'Admin');
+        if (user) auditBookingApprove(user.id, booking);
+      }
       setAnesPromptBookingId(null);
     } catch { toast.error('Failed to approve'); }
     finally { setAnesSubmitting(false); }
   };
 
-  const handleDeny = async (id: string) => {
-    setDenyingId(id);
+  const handleDeny = (id: string) => {
+    setDenyReasonInput('');
+    setDenyPromptBookingId(id);
+  };
+
+  const handleDenyPromptSubmit = async () => {
+    if (!denyPromptBookingId) return;
+    if (!denyReasonInput.trim()) { toast.error('Please enter a denial reason.'); return; }
+    const booking = bookings.find((b) => b.id === denyPromptBookingId);
+    setDenySubmitting(true);
     try {
-      await updateBooking(id, { status: 'denied' });
+      await updateBooking(denyPromptBookingId, { status: 'denied', denial_reason: denyReasonInput.trim(), updated_at: new Date().toISOString() });
       toast.success('Booking denied');
+      if (booking) {
+        notifyBookingDenied(booking, user?.full_name || 'Admin', denyReasonInput.trim());
+        if (user) auditBookingDeny(user.id, booking, denyReasonInput.trim());
+      }
+      setDenyPromptBookingId(null);
     } catch { toast.error('Failed to deny'); }
-    finally { setDenyingId(null); }
+    finally { setDenySubmitting(false); }
   };
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -97,7 +124,7 @@ export default function DashboardPage() {
 
   // Generate real sparkline data from the last 7 days of bookings
   const sparklineData = useMemo(() => {
-    const days: { d: string; total: number; pending: number; ongoing: number; completed: number }[] = [];
+    const days: { d: string; total: number; pending: number; ongoing: number; completed: number; cancelled: number; emergency: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -110,6 +137,8 @@ export default function DashboardPage() {
         pending: dayBookings.filter((b) => b.status === 'pending').length,
         ongoing: dayBookings.filter((b) => b.status === 'ongoing').length,
         completed: dayBookings.filter((b) => b.status === 'completed').length,
+        cancelled: dayBookings.filter((b) => b.status === 'cancelled').length,
+        emergency: dayBookings.filter((b) => b.is_emergency).length,
       });
     }
     return days;
@@ -127,6 +156,21 @@ export default function DashboardPage() {
     if (!isAdmin && user?.department_id) result = result.filter((b) => b.department_id === user.department_id);
     return result;
   }, [bookings, statusFilter, searchTerm, isAdmin, user]);
+
+  // Pagination for "All Bookings"
+  const DASH_PAGE_SIZE = 20;
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const totalBookingsPages = Math.max(1, Math.ceil(filtered.length / DASH_PAGE_SIZE));
+  const paginatedBookings = useMemo(() => {
+    const start = (bookingsPage - 1) * DASH_PAGE_SIZE;
+    return filtered.slice(start, start + DASH_PAGE_SIZE);
+  }, [filtered, bookingsPage]);
+  // Reset page when filters change
+  useMemo(() => { setBookingsPage(1); }, [statusFilter, searchTerm]);
+
+  if ((bookingsLoading || roomsLoading) && bookings.length === 0) {
+    return <PageLoader label="Loading dashboard…" />;
+  }
 
   return (
     <div className="page-container">
@@ -185,6 +229,61 @@ export default function DashboardPage() {
           </div>
         );
       })()}
+
+      {/* Deny Reason Prompt Modal */}
+      {denyPromptBookingId && (() => {
+        const b = bookings.find((bk) => bk.id === denyPromptBookingId);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.18 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                    <X className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-gray-900">Deny Booking</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Please provide a reason for denial</p>
+                  </div>
+                </div>
+                <button onClick={() => setDenyPromptBookingId(null)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+
+              {b && (
+                <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-lg text-sm">
+                  <p className="font-medium text-gray-800 truncate">{b.procedure}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{b.patient_name} · {getDeptName(b.department_id)} · {b.date}</p>
+                </div>
+              )}
+
+              <div className="mb-5">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Denial Reason</label>
+                <textarea
+                  autoFocus
+                  rows={3}
+                  value={denyReasonInput}
+                  onChange={(e) => setDenyReasonInput(e.target.value)}
+                  placeholder="e.g. Incomplete pre-operative clearance"
+                  className="w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-300 transition-colors resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="secondary" className="flex-1" onClick={() => setDenyPromptBookingId(null)}>Cancel</Button>
+                <Button variant="danger" className="flex-1" loading={denySubmitting} onClick={handleDenyPromptSubmit}>Deny</Button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
+
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="page-header">
@@ -349,7 +448,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       <Button variant="accent" size="sm" loading={approvingId === b.id} onClick={() => handleApprove(b.id)}>Approve</Button>
-                      <Button variant="outline" size="sm" loading={denyingId === b.id} onClick={() => handleDeny(b.id)}>Deny</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDeny(b.id)}>Deny</Button>
                     </div>
                   </div>
                 </div>
@@ -396,7 +495,7 @@ export default function DashboardPage() {
 
           {/* Mobile: Card list */}
           <div className="md:hidden divide-y divide-gray-50">
-            {filtered.map((b) => {
+            {paginatedBookings.map((b) => {
               const room = rooms.find((r) => r.id === b.or_room_id);
               const submittedAt = new Date(b.created_at).toLocaleString(undefined, {
                 month: 'short', day: 'numeric', year: 'numeric',
@@ -441,7 +540,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((b) => {
+                {paginatedBookings.map((b) => {
                   const room = rooms.find((r) => r.id === b.or_room_id);
                   const submittedAt = new Date(b.created_at).toLocaleString(undefined, {
                     month: 'short', day: 'numeric', year: 'numeric',
@@ -473,6 +572,30 @@ export default function DashboardPage() {
 
           {filtered.length === 0 && (
             <div className="px-4 py-14 text-center text-sm text-gray-400">No bookings found.</div>
+          )}
+          {/* Pagination */}
+          {totalBookingsPages > 1 && (
+            <div className="px-4 md:px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-xs text-gray-400">
+                Page {bookingsPage} of {totalBookingsPages} ({filtered.length} total)
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setBookingsPage((p) => Math.max(1, p - 1))}
+                  disabled={bookingsPage === 1}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4 text-gray-500" />
+                </button>
+                <button
+                  onClick={() => setBookingsPage((p) => Math.min(totalBookingsPages, p + 1))}
+                  disabled={bookingsPage === totalBookingsPages}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </motion.div>

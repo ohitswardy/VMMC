@@ -3,10 +3,13 @@
  * Centralised data access layer — all Supabase calls live here.
  * The rest of the app talks only to this module + the Zustand stores.
  *
- * Column name mapping note:
- *   DB → App
- *   procedure_name → procedure   (Booking)
- *   procedure_name → procedure   (BookingChangeRequest, RecurringTemplate)
+ * ⚠️  IMPORTANT — Column name mapping:
+ *   DB column         →  Frontend field
+ *   procedure_name    →  procedure        (Booking, BookingChangeRequest)
+ *
+ * All mapping is centralised in mapBooking() / mapBookingForDB() below.
+ * When adding new fields, ensure the mapping is updated if the DB column
+ * name differs from the TypeScript interface field name.
  */
 
 import { supabase } from './supabase';
@@ -394,5 +397,100 @@ export async function upsertNurseDuty(
       },
       { onConflict: 'or_room_id,date' }
     );
+  if (error) throw error;
+}
+
+// ── System Settings ──
+
+export async function fetchSystemSettings(): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('data')
+    .eq('id', 'global')
+    .single();
+  if (error) {
+    console.warn('fetchSystemSettings:', error.message);
+    return null;
+  }
+  return data?.data ?? null;
+}
+
+export async function upsertSystemSettings(
+  settings: Record<string, unknown>,
+  userId?: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('system_settings')
+    .upsert({
+      id: 'global',
+      data: settings,
+      updated_at: new Date().toISOString(),
+      updated_by: userId ?? null,
+    });
+  if (error) throw error;
+}
+
+// ── Privacy Acknowledgments ──
+
+export async function checkPrivacyAcknowledgment(
+  userId: string,
+  version: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('privacy_acknowledgments')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('version', version)
+    .maybeSingle();
+  if (error) {
+    console.warn('checkPrivacyAcknowledgment:', error.message);
+    return false;
+  }
+  return !!data;
+}
+
+export async function insertPrivacyAcknowledgment(
+  userId: string,
+  version: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('privacy_acknowledgments')
+    .upsert(
+      { user_id: userId, version, acknowledged_at: new Date().toISOString() },
+      { onConflict: 'user_id,version' }
+    );
+  if (error) throw error;
+}
+
+// ── PACU Assignments ──
+
+export async function fetchAllPACUAssignments(): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from('pacu_assignments')
+    .select('date, names');
+  if (error) {
+    console.warn('fetchAllPACUAssignments:', error.message);
+    return {};
+  }
+  const map: Record<string, string> = {};
+  for (const row of data ?? []) {
+    map[row.date] = row.names;
+  }
+  return map;
+}
+
+export async function upsertPACUAssignment(
+  date: string,
+  names: string,
+  userId?: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('pacu_assignments')
+    .upsert({
+      date,
+      names,
+      updated_by: userId ?? null,
+      updated_at: new Date().toISOString(),
+    });
   if (error) throw error;
 }

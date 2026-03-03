@@ -12,14 +12,15 @@ import {
 import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { getDeptColor, getDeptName, calcUtilization } from '../lib/utils';
 import PageHelpButton from '../components/ui/PageHelpButton';
+import PageLoader from '../components/ui/PageLoader';
 import { REPORTS_HELP } from '../lib/helpContent';
 import type { DepartmentId } from '../lib/constants';
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444', '#84cc16'];
 
 export default function ReportsPage() {
-  const { bookings } = useBookingsStore();
-  const { rooms } = useORRoomsStore();
+  const { bookings, isLoading: bookingsLoading } = useBookingsStore();
+  const { rooms, isLoading: roomsLoading } = useORRoomsStore();
 
   // OR Utilization per room
   const utilizationData = useMemo(() => {
@@ -84,6 +85,10 @@ export default function ReportsPage() {
       totalCases: bookings.length,
     };
   }, [bookings, utilizationData]);
+
+  if ((bookingsLoading || roomsLoading) && bookings.length === 0) {
+    return <PageLoader label="Loading reports…" />;
+  }
 
   return (
     <div className="page-container">

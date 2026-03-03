@@ -16,9 +16,27 @@ function getDeptName(deptId: DepartmentId): string {
   return DEPARTMENT_MAP[deptId]?.name || deptId;
 }
 
+/**
+ * Module-level profile cache with a short TTL to batch rapid notification calls.
+ * Avoids N+1 queries when multiple notification functions are called in quick succession.
+ */
+let _profileCache: UserProfile[] | null = null;
+let _profileCacheExpiry = 0;
+const PROFILE_CACHE_TTL_MS = 30_000; // 30 seconds
+
+async function getCachedProfiles(): Promise<UserProfile[]> {
+  const now = Date.now();
+  if (_profileCache && now < _profileCacheExpiry) {
+    return _profileCache;
+  }
+  _profileCache = await fetchAllProfiles();
+  _profileCacheExpiry = now + PROFILE_CACHE_TTL_MS;
+  return _profileCache;
+}
+
 /** Get all admin users (super_admin + anesthesiology_admin) */
 async function getAdminUsers(): Promise<UserProfile[]> {
-  const profiles = await fetchAllProfiles();
+  const profiles = await getCachedProfiles();
   return profiles.filter(
     (p) => p.is_active && (p.role === 'super_admin' || p.role === 'anesthesiology_admin')
   );
@@ -26,7 +44,7 @@ async function getAdminUsers(): Promise<UserProfile[]> {
 
 /** Get all users in a specific department */
 async function getDepartmentUsers(departmentId: DepartmentId): Promise<UserProfile[]> {
-  const profiles = await fetchAllProfiles();
+  const profiles = await getCachedProfiles();
   return profiles.filter(
     (p) => p.is_active && p.department_id === departmentId
   );
@@ -160,7 +178,7 @@ export async function notifyEmergencyInsertion(booking: Booking, insertedByName:
     const adminIds = admins.map((a) => a.id);
 
     // Also notify all department users (so everyone is aware)
-    const allProfiles = await fetchAllProfiles();
+    const allProfiles = await getCachedProfiles();
     const allActiveUserIds = allProfiles
       .filter((p) => p.is_active && p.role !== 'viewer')
       .map((p) => p.id);
@@ -294,7 +312,7 @@ export async function notifyRoomStatusChange(
 ) {
   try {
     // Notify all admins and nurses
-    const allProfiles = await fetchAllProfiles();
+    const allProfiles = await getCachedProfiles();
     const targetIds = allProfiles
       .filter(
         (p) =>

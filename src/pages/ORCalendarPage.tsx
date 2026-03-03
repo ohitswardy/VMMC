@@ -257,7 +257,7 @@ export default function ORCalendarPage() {
           <input
             type="text"
             value={assignments[format(selectedDate, 'yyyy-MM-dd')] || ''}
-            onChange={(e) => setAssignment(format(selectedDate, 'yyyy-MM-dd'), e.target.value)}
+            onChange={(e) => setAssignment(format(selectedDate, 'yyyy-MM-dd'), e.target.value, user?.id)}
             placeholder="e.g. Sarmiento/Montesa/Castillo"
             className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300 transition-colors"
           />

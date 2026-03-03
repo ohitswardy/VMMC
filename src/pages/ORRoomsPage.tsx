@@ -26,6 +26,7 @@ import Modal from '../components/ui/Modal';
 import { Input } from '../components/ui/FormFields';
 import ORPriorityModal from '../components/booking/ORPriorityModal';
 import PageHelpButton from '../components/ui/PageHelpButton';
+import PageLoader from '../components/ui/PageLoader';
 import { OR_ROOMS_HELP } from '../lib/helpContent';
 import type { ORRoom } from '../lib/types';
 import { format } from 'date-fns';
@@ -88,7 +89,7 @@ function SortableRoomCard({ room, index, isDragEnabled, children }: SortableRoom
 
 export default function ORRoomsPage() {
   const { user } = useAuthStore();
-  const { rooms, addRoom, updateRoom, deleteRoom, reorderRooms } = useORRoomsStore();
+  const { rooms, addRoom, updateRoom, deleteRoom, reorderRooms, isLoading } = useORRoomsStore();
   const [editingRoom, setEditingRoom] = useState<ORRoom | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPriorityOpen, setIsPriorityOpen] = useState(false);
@@ -219,6 +220,10 @@ export default function ORRoomsPage() {
       setIsDeleting(false);
     }
   };
+
+  if (isLoading && rooms.length === 0) {
+    return <PageLoader label="Loading OR rooms…" />;
+  }
 
   return (
     <div className="page-container">

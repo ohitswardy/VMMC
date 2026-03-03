@@ -138,7 +138,7 @@ export default function DocumentsPage() {
               <input
                 type="text"
                 value={pacuNames}
-                onChange={(e) => setAssignment(selectedDate, e.target.value)}
+                onChange={(e) => setAssignment(selectedDate, e.target.value, user?.id)}
                 placeholder="e.g. Sarmiento/Montesa/Castillo"
                 className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-2 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300 transition-colors"
               />

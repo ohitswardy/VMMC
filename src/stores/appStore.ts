@@ -380,18 +380,37 @@ export const useORPriorityScheduleStore = create<ORPriorityScheduleState>((set) 
 }));
 
 // ── PACU Assignments Store ──
-// Stores per-date PACU resident names (persisted to localStorage)
+// Stores per-date PACU resident names (persisted to localStorage + Supabase)
 interface PACUAssignmentsState {
   assignments: Record<string, string>; // date (YYYY-MM-DD) → names string
-  setAssignment: (date: string, names: string) => void;
+  setAssignment: (date: string, names: string, userId?: string) => void;
+  loadAssignments: () => Promise<void>;
 }
 
 export const usePACUStore = create<PACUAssignmentsState>()(
   persist(
     (set) => ({
       assignments: {},
-      setAssignment: (date, names) =>
-        set((s) => ({ assignments: { ...s.assignments, [date]: names } })),
+      setAssignment: (date, names, userId) => {
+        set((s) => ({ assignments: { ...s.assignments, [date]: names } }));
+        // Fire-and-forget persist to Supabase
+        import('../lib/supabaseService').then(({ upsertPACUAssignment }) => {
+          upsertPACUAssignment(date, names, userId).catch((err) =>
+            console.warn('Failed to sync PACU assignment:', err)
+          );
+        });
+      },
+      loadAssignments: async () => {
+        try {
+          const { fetchAllPACUAssignments } = await import('../lib/supabaseService');
+          const serverAssignments = await fetchAllPACUAssignments();
+          if (Object.keys(serverAssignments).length > 0) {
+            set((s) => ({ assignments: { ...s.assignments, ...serverAssignments } }));
+          }
+        } catch (err) {
+          console.warn('Failed to load PACU assignments from server:', err);
+        }
+      },
     }),
     { name: 'vmmc-pacu-assignments' }
   )

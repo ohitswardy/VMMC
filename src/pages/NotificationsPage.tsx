@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/authStore';
 import Button from '../components/ui/Button';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import PageHelpButton from '../components/ui/PageHelpButton';
+import PageLoader from '../components/ui/PageLoader';
 import { NOTIFICATIONS_HELP } from '../lib/helpContent';
 import type { Notification } from '../lib/types';
 
@@ -52,7 +53,7 @@ const typeIcon = (type: string) => {
 
 export default function NotificationsPage() {
   const { user } = useAuthStore();
-  const { notifications, markAsRead, markAllAsRead, removeNotification } = useNotificationsStore();
+  const { notifications, markAsRead, markAllAsRead, removeNotification, isLoading } = useNotificationsStore();
   const navigate = useNavigate();
   const [filterType, setFilterType] = useState('all');
   const PAGE_SIZE = 10;
@@ -94,6 +95,10 @@ export default function NotificationsPage() {
     e.stopPropagation();
     removeNotification(id);
   };
+
+  if (isLoading && notifications.length === 0) {
+    return <PageLoader label="Loading notifications…" />;
+  }
 
   return (
     <div className="page-container">

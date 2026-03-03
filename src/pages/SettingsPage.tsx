@@ -5,6 +5,8 @@ import Button from '../components/ui/Button';
 import { Input } from '../components/ui/FormFields';
 import PageHelpButton from '../components/ui/PageHelpButton';
 import { SETTINGS_HELP } from '../lib/helpContent';
+import { useAuthStore } from '../stores/authStore';
+import { fetchSystemSettings, upsertSystemSettings } from '../lib/supabaseService';
 import toast from 'react-hot-toast';
 
 const STORAGE_KEY = 'vmmc_settings';
@@ -38,7 +40,7 @@ const NOTIFICATION_ITEMS = [
   'Case nearing estimated end time',
 ];
 
-function loadSettings(): SettingsData {
+function loadSettingsFromLocal(): SettingsData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
@@ -47,11 +49,35 @@ function loadSettings(): SettingsData {
 }
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<SettingsData>(loadSettings);
+  const { user } = useAuthStore();
+  const [settings, setSettings] = useState<SettingsData>(loadSettingsFromLocal);
   const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Track original state for dirty detection
-  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(loadSettings()));
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(loadSettingsFromLocal()));
+
+  // Load from Supabase on mount, fallback to localStorage
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const remote = await fetchSystemSettings();
+        if (!cancelled && remote) {
+          const merged = { ...DEFAULT_SETTINGS, ...(remote as unknown as Partial<SettingsData>) };
+          setSettings(merged);
+          setSavedSnapshot(JSON.stringify(merged));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        }
+      } catch {
+        // fallback to localStorage — already loaded
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     setIsDirty(JSON.stringify(settings) !== savedSnapshot);
@@ -82,15 +108,21 @@ export default function SettingsPage() {
     return null;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const error = validate();
     if (error) { toast.error(error); return; }
+    setIsSaving(true);
     try {
+      // Save to Supabase first
+      await upsertSystemSettings(settings as unknown as Record<string, unknown>, user?.id);
+      // Also keep localStorage as a fast local cache
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
       setSavedSnapshot(JSON.stringify(settings));
       toast.success('Settings saved successfully!');
     } catch {
-      toast.error('Failed to save settings.');
+      toast.error('Failed to save settings to server.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -209,7 +241,7 @@ export default function SettingsPage() {
 
       {/* Save button */}
       <div className="flex justify-end">
-        <Button icon={<Save className="w-4 h-4" />} onClick={handleSave} disabled={!isDirty}>
+        <Button icon={<Save className="w-4 h-4" />} onClick={handleSave} disabled={!isDirty || isLoading} loading={isSaving}>
           {isDirty ? 'Save Settings' : 'Saved'}
         </Button>
       </div>

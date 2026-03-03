@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Clock, User, Stethoscope, AlertCircle, CheckCircle2, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
+import toast from 'react-hot-toast';
 import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { getDeptColor, getDeptName, formatTime, getRoomStatusInfo } from '../lib/utils';
 import { useAuthStore } from '../stores/authStore';
@@ -12,6 +13,7 @@ import type { Booking } from '../lib/types';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
 import PageHelpButton from '../components/ui/PageHelpButton';
+import PageLoader from '../components/ui/PageLoader';
 import { LIVE_BOARD_HELP } from '../lib/helpContent';
 
 const fadeUp = {
@@ -37,8 +39,8 @@ const CONTEXT_LABELS: Record<string, { text: string; color: string; bg: string; 
 
 export default function LiveBoardPage() {
   const { user } = useAuthStore();
-  const { liveStatuses, setLiveStatus } = useORRoomsStore();
-  const { updateBooking } = useBookingsStore();
+  const { liveStatuses, setLiveStatus, isLoading: roomsLoading } = useORRoomsStore();
+  const { updateBooking, isLoading: bookingsLoading } = useBookingsStore();
   const isAnesthAdmin = user?.role === 'anesthesiology_admin';
 
   // Pending confirmation state
@@ -55,7 +57,8 @@ export default function LiveBoardPage() {
   // Elapsed timer tick (re-renders every 30s for ongoing case timers)
   const [, setTick] = useState(0);
 
-  // Auto-refresh polling — reload bookings & live statuses every 30 seconds
+  // Fallback polling — realtime subscriptions in App.tsx handle most updates,
+  // but we keep a slower 60s poll as a safety net and to refresh elapsed timers.
   const { loadBookings } = useBookingsStore();
   const { loadLiveStatuses } = useORRoomsStore();
 
@@ -64,7 +67,7 @@ export default function LiveBoardPage() {
       loadBookings();
       loadLiveStatuses();
       setTick((t) => t + 1); // trigger elapsed time re-render
-    }, 30_000);
+    }, 60_000);
     return () => clearInterval(interval);
   }, [loadBookings, loadLiveStatuses]);
 
@@ -251,14 +254,21 @@ export default function LiveBoardPage() {
         // idle — just set room status
         await setLiveStatus(roomId, to);
       }
+
+      // Only fire notification + audit after successful status update
+      notifyRoomStatusChange(pending.roomName, to, user?.full_name || 'Admin');
+      if (user) auditRoomStatusChange(user.id, roomId, pending.roomName, from, to);
     } catch (err) {
       console.error('Failed to update status:', err);
+      toast.error('Failed to update room status.');
     }
 
-    notifyRoomStatusChange(pending.roomName, to, user?.full_name || 'Admin');
-    if (user) auditRoomStatusChange(user.id, roomId, pending.roomName, from, to);
     setPending(null);
   };
+
+  if ((roomsLoading || bookingsLoading) && Object.keys(liveStatuses).length === 0) {
+    return <PageLoader label="Loading live board…" />;
+  }
 
   return (
     <div className="page-container">

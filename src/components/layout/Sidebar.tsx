@@ -12,7 +12,7 @@ import { useNotificationsStore } from '../../stores/appStore';
 const navItems = [
   { to: '/calendar',      icon: Calendar,       label: 'Calendar',  roles: ['super_admin', 'anesthesiology_admin', 'department_user', 'nurse', 'viewer'] },
   { to: '/dashboard',     icon: LayoutDashboard,label: 'Dashboard', roles: ['super_admin', 'anesthesiology_admin'] },
-  { to: '/live-board',    icon: Activity,       label: 'Live Board',roles: ['super_admin', 'anesthesiology_admin', 'department_user', 'viewer'] },
+  { to: '/live-board',    icon: Activity,       label: 'Live Board',roles: ['super_admin', 'anesthesiology_admin', 'department_user', 'nurse', 'viewer'] },
   { to: '/bookings',      icon: ClipboardList,  label: 'Bookings',  roles: ['super_admin', 'anesthesiology_admin', 'department_user'] },
   // Nurses get OR Rooms access only to manage nurse-on-duty assignments
   { to: '/or-rooms',      icon: Building2,      label: 'OR Rooms',  roles: ['super_admin', 'anesthesiology_admin', 'nurse'] },

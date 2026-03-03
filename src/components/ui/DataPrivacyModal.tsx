@@ -41,7 +41,7 @@ export default function DataPrivacyModal({ isOpen, onClose, userId }: DataPrivac
   }, [isOpen]);
 
   const handleClose = () => {
-    // Closing the modal = acknowledging the policy
+    // Closing the modal = acknowledging the policy (fire-and-forget server persistence)
     acknowledgePolicy(userId);
     onClose();
   };

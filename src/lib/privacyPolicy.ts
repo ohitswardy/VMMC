@@ -94,7 +94,7 @@ export const PRIVACY_POLICY_SECTIONS = [
   },
 ] as const;
 
-// ── Local storage helpers for version acknowledgment ──
+// ── Local storage helpers for version acknowledgment (local cache) ──
 const STORAGE_KEY = 'vmmc-privacy-policy-ack';
 
 interface PrivacyAck {
@@ -105,6 +105,7 @@ interface PrivacyAck {
 
 /**
  * Check if the user has acknowledged the current policy version.
+ * Uses localStorage as a fast check; server-side check can be done separately.
  */
 export function hasAcknowledgedCurrentPolicy(userId: string): boolean {
   try {
@@ -118,15 +119,37 @@ export function hasAcknowledgedCurrentPolicy(userId: string): boolean {
 }
 
 /**
- * Record that the user acknowledged the current policy version.
+ * Check server-side acknowledgment (for cross-device reliability).
+ * Returns true if the user has acknowledged the current version on the server.
  */
-export function acknowledgePolicy(userId: string): void {
+export async function hasAcknowledgedPolicyServer(userId: string): Promise<boolean> {
+  try {
+    const { checkPrivacyAcknowledgment } = await import('./supabaseService');
+    return await checkPrivacyAcknowledgment(userId, PRIVACY_POLICY_VERSION);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Record that the user acknowledged the current policy version.
+ * Persists to both localStorage (fast) and Supabase (durable).
+ */
+export async function acknowledgePolicy(userId: string): Promise<void> {
   const ack: PrivacyAck = {
     version: PRIVACY_POLICY_VERSION,
     userId,
     timestamp: new Date().toISOString(),
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ack));
+
+  // Also persist to server for cross-device / compliance purposes
+  try {
+    const { insertPrivacyAcknowledgment } = await import('./supabaseService');
+    await insertPrivacyAcknowledgment(userId, PRIVACY_POLICY_VERSION);
+  } catch (err) {
+    console.warn('Failed to persist privacy acknowledgment to server:', err);
+  }
 }
 
 /**

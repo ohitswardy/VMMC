@@ -20,13 +20,14 @@ import {
   useORRoomsStore,
   useORPriorityScheduleStore,
   useAuditLogsStore,
+  usePACUStore,
 } from './stores/appStore';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 import { sendUpcomingReminders, sendPurgeWarnings } from './lib/notificationHelper';
 import type { Notification } from './lib/types';
 import DataPrivacyModal from './components/ui/DataPrivacyModal';
-import { hasAcknowledgedCurrentPolicy } from './lib/privacyPolicy';
+import { hasAcknowledgedCurrentPolicy, hasAcknowledgedPolicyServer } from './lib/privacyPolicy';
 import useIdleTimeout from './lib/useIdleTimeout';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
@@ -47,6 +48,7 @@ export default function App() {
   const { loadRooms, loadLiveStatuses } = useORRoomsStore();
   const { loadSchedule } = useORPriorityScheduleStore();
   const { loadLogs } = useAuditLogsStore();
+  const { loadAssignments: loadPACUAssignments } = usePACUStore();
 
   // ── Data Privacy Modal state ──
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -56,6 +58,14 @@ export default function App() {
   const [showIdleWarning, setShowIdleWarning] = useState(false);
   const idleCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [idleCountdown, setIdleCountdown] = useState(IDLE_WARNING_MS / 1000); // seconds
+
+  // Disable idle timeout when in kiosk/fullscreen mode (e.g. Live Board on a wall display)
+  const [isKioskMode, setIsKioskMode] = useState(!!document.fullscreenElement);
+  useEffect(() => {
+    const handler = () => setIsKioskMode(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   const handleIdleWarning = useCallback(() => {
     setShowIdleWarning(true);
@@ -86,7 +96,7 @@ export default function App() {
   useIdleTimeout({
     timeoutMs: IDLE_TIMEOUT_MS,
     warningMs: IDLE_WARNING_MS,
-    enabled: isAuthenticated && !authLoading,
+    enabled: isAuthenticated && !authLoading && !isKioskMode,
     onIdle: handleIdleLogout,
     onWarning: handleIdleWarning,
     onWarningDismiss: handleIdleWarningDismiss,
@@ -104,10 +114,16 @@ export default function App() {
   // Logout clears the localStorage ack (authStore), so the next login always shows it.
   // Page refresh keeps the ack → modal stays hidden.
   // Bumping PRIVACY_POLICY_VERSION also re-triggers it for all users.
+  // Checks both localStorage (fast) and server (cross-device reliability).
   useEffect(() => {
     if (isAuthenticated && user && !authLoading) {
       if (!hasAcknowledgedCurrentPolicy(user.id)) {
-        setShowPrivacyModal(true);
+        // localStorage says not acknowledged — double-check server in case another device acknowledged
+        hasAcknowledgedPolicyServer(user.id).then((serverAcked) => {
+          if (!serverAcked) {
+            setShowPrivacyModal(true);
+          }
+        });
       }
     }
   }, [isAuthenticated, user, authLoading]);
@@ -124,12 +140,13 @@ export default function App() {
       loadLiveStatuses();
       loadSchedule();
       loadNotifications(user.id);
+      loadPACUAssignments();
       // Load audit logs for admin roles
       if (user.role === 'super_admin' || user.role === 'anesthesiology_admin') {
         loadLogs();
       }
     }
-  }, [isAuthenticated, user, authLoading, loadBookings, loadRooms, loadLiveStatuses, loadSchedule, loadNotifications, loadLogs]);
+  }, [isAuthenticated, user, authLoading, loadBookings, loadRooms, loadLiveStatuses, loadSchedule, loadNotifications, loadLogs, loadPACUAssignments]);
 
   // ── Real-time subscription for notifications ──
   // Listens for new notifications inserted for the current user and adds them to the store
@@ -157,6 +174,49 @@ export default function App() {
       supabase.removeChannel(channel);
     };
   }, [isAuthenticated, user, addNotification]);
+
+  // ── Real-time subscription for bookings ──
+  // Automatically refreshes the bookings list when any row is inserted, updated, or deleted
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const channel = supabase
+      .channel('bookings-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings' },
+        () => {
+          loadBookings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, user, loadBookings]);
+
+  // ── Real-time subscription for OR rooms & live statuses ──
+  // Refreshes rooms when configuration changes, and live statuses when room status updates
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const roomsChannel = supabase
+      .channel('or-rooms-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'or_rooms' },
+        () => {
+          loadRooms();
+          loadLiveStatuses();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(roomsChannel);
+    };
+  }, [isAuthenticated, user, loadRooms, loadLiveStatuses]);
 
   // ── Periodic reminder & purge-warning scheduler ──
   // Runs every 5 minutes for admins, checks bookings for 24h/2h reminders and purge warnings

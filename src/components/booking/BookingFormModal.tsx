@@ -305,12 +305,30 @@ export default function BookingFormModal({ isOpen, onClose, rooms, bookings }: P
     // ── Bump off to-follow cases for emergency insertion ──
     if (form.is_emergency && bumpedCases.length > 0) {
       const now = new Date().toISOString();
-      for (const bc of bumpedCases) {
-        await updateBooking(bc.id, {
-          status: 'rescheduled',
-          notes: `${bc.notes ? bc.notes + ' | ' : ''}Bumped off by emergency case: ${form.patient_name} — ${form.procedure} (${form.emergency_reason})`,
-          updated_at: now,
-        });
+      const alreadyBumped: { id: string; originalStatus: string; originalNotes?: string }[] = [];
+      try {
+        for (const bc of bumpedCases) {
+          alreadyBumped.push({ id: bc.id, originalStatus: bc.status, originalNotes: bc.notes });
+          await updateBooking(bc.id, {
+            status: 'rescheduled',
+            notes: `${bc.notes ? bc.notes + ' | ' : ''}Bumped off by emergency case: ${form.patient_name} — ${form.procedure} (${form.emergency_reason})`,
+            updated_at: now,
+          });
+        }
+      } catch (bumpErr) {
+        // Rollback already-bumped bookings to their original state
+        for (const reverted of alreadyBumped) {
+          try {
+            await updateBooking(reverted.id, {
+              status: reverted.originalStatus as any,
+              notes: reverted.originalNotes,
+              updated_at: now,
+            });
+          } catch { /* best-effort rollback */ }
+        }
+        toast.error('Failed to reschedule conflicting cases. Emergency insertion aborted.');
+        setIsSubmitting(false);
+        return;
       }
     }
 

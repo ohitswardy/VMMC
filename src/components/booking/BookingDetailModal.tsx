@@ -98,25 +98,34 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
       return;
     }
     setActionLoading('approve');
-    await updateBooking(booking.id, { status: 'approved', approved_by: user?.id, updated_at: new Date().toISOString() });
-    toast.success('Booking approved.');
-    notifyBookingApproved(booking, user?.full_name || 'Admin');
-    if (user) auditBookingApprove(user.id, booking);
-    setActionLoading(null);
-    setShowApproveConfirm(false);
-    onClose();
+    try {
+      await updateBooking(booking.id, { status: 'approved', approved_by: user?.id, updated_at: new Date().toISOString() });
+      toast.success('Booking approved.');
+      notifyBookingApproved(booking, user?.full_name || 'Admin');
+      if (user) auditBookingApprove(user.id, booking);
+      setShowApproveConfirm(false);
+      onClose();
+    } catch {
+      toast.error('Failed to approve booking.');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleDeny = async () => {
     if (!denyReason.trim()) { toast.error('Please enter a denial reason.'); return; }
     setActionLoading('deny');
-    await updateBooking(booking.id, { status: 'denied', denial_reason: denyReason.trim(), updated_at: new Date().toISOString() });
-    toast.success('Booking denied.');
-    // Notify the booking creator and department users
-    notifyBookingDenied(booking, user?.full_name || 'Admin', denyReason.trim());
-    if (user) auditBookingDeny(user.id, booking, denyReason.trim());
-    setActionLoading(null);
-    onClose();
+    try {
+      await updateBooking(booking.id, { status: 'denied', denial_reason: denyReason.trim(), updated_at: new Date().toISOString() });
+      toast.success('Booking denied.');
+      notifyBookingDenied(booking, user?.full_name || 'Admin', denyReason.trim());
+      if (user) auditBookingDeny(user.id, booking, denyReason.trim());
+      onClose();
+    } catch {
+      toast.error('Failed to deny booking.');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -125,13 +134,17 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
       return;
     }
     setEditSaving(true);
-    await updateBooking(booking.id, { ...editForm, updated_at: new Date().toISOString() });
-    toast.success('Booking updated.');
-    // Notify the booking creator and department users about the edit
-    notifyBookingEdited(booking, user?.full_name || 'Admin');
-    if (user) auditBookingEdit(user.id, booking.id, editForm as Record<string, unknown>);
-    setEditSaving(false);
-    setIsEditing(false);
+    try {
+      await updateBooking(booking.id, { ...editForm, updated_at: new Date().toISOString() });
+      toast.success('Booking updated.');
+      notifyBookingEdited(booking, user?.full_name || 'Admin');
+      if (user) auditBookingEdit(user.id, booking.id, editForm as Record<string, unknown>);
+      setIsEditing(false);
+    } catch {
+      toast.error('Failed to update booking.');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleRequestChange = () => {

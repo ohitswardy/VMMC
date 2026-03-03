@@ -5,6 +5,7 @@ import { DatePicker } from '../components/ui/DatePicker';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import { useAuditLogsStore } from '../stores/appStore';
 import PageHelpButton from '../components/ui/PageHelpButton';
+import PageLoader from '../components/ui/PageLoader';
 import { AUDIT_LOGS_HELP } from '../lib/helpContent';
 
 const PAGE_SIZE = 25;
@@ -40,7 +41,7 @@ function renderDiff(oldVals: Record<string, unknown> | null, newVals: Record<str
 }
 
 export default function AuditLogsPage() {
-  const { logs } = useAuditLogsStore();
+  const { logs, isLoading } = useAuditLogsStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [dateEndFilter, setDateEndFilter] = useState('');
@@ -99,6 +100,10 @@ export default function AuditLogsPage() {
   const getUserName = (log: typeof logs[0]) => {
     return log.user_profile?.full_name || log.user_id;
   };
+
+  if (isLoading && logs.length === 0) {
+    return <PageLoader label="Loading audit logs…" />;
+  }
 
   return (
     <div className="page-container">
