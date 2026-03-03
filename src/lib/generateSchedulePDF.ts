@@ -126,7 +126,7 @@ export async function generateSchedulePDF(
   roomOrder.forEach(roomId => {
     const roomBookings = bookingsByRoom.get(roomId)!;
     const room = rooms.find(r => r.id === roomId);
-    const roomLabel = room ? `Rm ${room.number}` : '';
+    const roomLabel = room ? room.name : '';
 
     roomGroupStartRows.add(currentRow);
 

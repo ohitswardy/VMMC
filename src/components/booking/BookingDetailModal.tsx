@@ -43,15 +43,16 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
   // Anes admin: no restrictions on pending & future bookings
   const canAdminChange = isAdmin && !['completed', 'cancelled', 'denied'].includes(booking.status);
 
-  // Noon block: non-admin can't change same-day bookings after 12 PM
+  // Non-admin: uses unified cutoff (24h before OR same-day before noon)
+  const canDeptChange = !isAdmin && user?.department_id === booking.department_id &&
+    !['completed', 'cancelled', 'denied', 'ongoing'].includes(booking.status) && canModifyBooking(booking);
+
+  // Show noon-blocked message for same-day bookings that can't be modified
   const _now = new Date();
   const _todayStart = startOfDay(_now);
   const noonBlocked = !isAdmin &&
     startOfDay(parseISO(booking.date)).getTime() === _todayStart.getTime() &&
     _now.getHours() >= 12 && booking.status === 'approved';
-
-  const canDeptChange = !isAdmin && user?.department_id === booking.department_id &&
-    !['completed', 'cancelled', 'denied', 'ongoing'].includes(booking.status) && !noonBlocked;
 
   const canChange = canAdminChange || canDeptChange;
   const deptColor = getDeptColor(booking.department_id);
@@ -66,6 +67,7 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
   const [denyMode, setDenyMode] = useState(false);
   const [denyReason, setDenyReason] = useState('');
   const [actionLoading, setActionLoading] = useState<'approve' | 'deny' | null>(null);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
 
   // Edit mode (anes admin)
   const [isEditing, setIsEditing] = useState(false);
@@ -91,13 +93,17 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
   };
 
   const handleApprove = async () => {
+    if (!showApproveConfirm) {
+      setShowApproveConfirm(true);
+      return;
+    }
     setActionLoading('approve');
     await updateBooking(booking.id, { status: 'approved', approved_by: user?.id, updated_at: new Date().toISOString() });
     toast.success('Booking approved.');
-    // Notify the booking creator and department users
     notifyBookingApproved(booking, user?.full_name || 'Admin');
     if (user) auditBookingApprove(user.id, booking);
     setActionLoading(null);
+    setShowApproveConfirm(false);
     onClose();
   };
 
@@ -178,7 +184,10 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
         {/* ── Edit Mode (anes admin) ── */}
         {isEditing ? (
           <div className="space-y-4 p-4 rounded-[10px] bg-accent-50 border border-accent-100">
-            <p className="text-xs font-semibold text-accent-700 uppercase tracking-wide">Editing Booking</p>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 rounded-full bg-accent-500 animate-pulse" />
+              <p className="text-xs font-semibold text-accent-700 uppercase tracking-wide">Editing Booking</p>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <DatePicker label="Date" value={editForm.date} onChange={(v) => setEditForm((p) => ({ ...p, date: v }))} required />
@@ -290,6 +299,24 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
               <p className="text-sm font-semibold text-gray-800">📞 Contact {ANES_DEPARTMENT_CONTACT.name}</p>
               <p className="text-xs text-gray-600 mt-1">{ANES_DEPARTMENT_CONTACT.phone}</p>
               <p className="text-xs text-gray-600">✉️ {ANES_DEPARTMENT_CONTACT.email}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Approve confirmation */}
+        {showApproveConfirm && !isEditing && !denyMode && (
+          <div className="p-3 rounded-[10px] bg-emerald-50 border border-emerald-100 space-y-2">
+            <p className="text-sm font-semibold text-emerald-700">Confirm Approval</p>
+            <p className="text-xs text-emerald-600">
+              Approve <span className="font-medium">"{booking.procedure}"</span> for {booking.patient_name} on {booking.date}?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" size="sm" type="button" onClick={() => setShowApproveConfirm(false)}>
+                Cancel
+              </Button>
+              <Button variant="accent" size="sm" type="button" loading={actionLoading === 'approve'} icon={<CheckCircle className="w-3.5 h-3.5" />} onClick={handleApprove}>
+                Confirm Approve
+              </Button>
             </div>
           </div>
         )}

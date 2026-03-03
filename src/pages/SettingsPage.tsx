@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Archive, Bell, Save } from 'lucide-react';
 import Button from '../components/ui/Button';
@@ -7,15 +7,91 @@ import PageHelpButton from '../components/ui/PageHelpButton';
 import { SETTINGS_HELP } from '../lib/helpContent';
 import toast from 'react-hot-toast';
 
+const STORAGE_KEY = 'vmmc_settings';
+
+interface SettingsData {
+  bufferTime: string;
+  downloadRetention: string;
+  archiveRetention: string;
+  purgeWarningHours: string;
+  autoArchive: boolean;
+  notifications: Record<string, boolean>;
+}
+
+const DEFAULT_SETTINGS: SettingsData = {
+  bufferTime: '30',
+  downloadRetention: '7',
+  archiveRetention: '30',
+  purgeWarningHours: '48',
+  autoArchive: true,
+  notifications: {},
+};
+
+const NOTIFICATION_ITEMS = [
+  'Booking confirmation',
+  'Approval/denial with reason',
+  'Schedule changes or cancellations',
+  '24-hour reminder to requesting department',
+  '2-hour reminder to requesting department',
+  'Emergency case preemption alerts',
+  'New booking request (Anesthesia)',
+  'Case nearing estimated end time',
+];
+
+function loadSettings(): SettingsData {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return { ...DEFAULT_SETTINGS };
+}
+
 export default function SettingsPage() {
-  const [bufferTime, setBufferTime] = useState('30');
-  const [downloadRetention, setDownloadRetention] = useState('7');
-  const [archiveRetention, setArchiveRetention] = useState('30');
-  const [purgeWarningHours, setPurgeWarningHours] = useState('48');
-  const [autoArchive, setAutoArchive] = useState(true);
+  const [settings, setSettings] = useState<SettingsData>(loadSettings);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Track original state for dirty detection
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(loadSettings()));
+
+  useEffect(() => {
+    setIsDirty(JSON.stringify(settings) !== savedSnapshot);
+  }, [settings, savedSnapshot]);
+
+  const update = <K extends keyof SettingsData>(key: K, value: SettingsData[K]) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleNotification = (item: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      notifications: { ...prev.notifications, [item]: !(prev.notifications[item] ?? true) },
+    }));
+  };
+
+  const isNotifEnabled = (item: string) => settings.notifications[item] ?? true;
+
+  const validate = (): string | null => {
+    const buf = parseInt(settings.bufferTime, 10);
+    if (isNaN(buf) || buf < 0 || buf > 120) return 'Buffer time must be between 0 and 120 minutes.';
+    const dl = parseInt(settings.downloadRetention, 10);
+    if (isNaN(dl) || dl < 1 || dl > 90) return 'Download window must be between 1 and 90 days.';
+    const ar = parseInt(settings.archiveRetention, 10);
+    if (isNaN(ar) || ar < 7 || ar > 365) return 'Archive retention must be between 7 and 365 days.';
+    const pw = parseInt(settings.purgeWarningHours, 10);
+    if (isNaN(pw) || pw < 12 || pw > 168) return 'Purge warning must be between 12 and 168 hours.';
+    return null;
+  };
 
   const handleSave = () => {
-    toast.success('Settings saved successfully!');
+    const error = validate();
+    if (error) { toast.error(error); return; }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      setSavedSnapshot(JSON.stringify(settings));
+      toast.success('Settings saved successfully!');
+    } catch {
+      toast.error('Failed to save settings.');
+    }
   };
 
   return (
@@ -42,8 +118,8 @@ export default function SettingsPage() {
           <Input
             label="Default Buffer Time Between Cases (minutes)"
             type="number"
-            value={bufferTime}
-            onChange={(e) => setBufferTime(e.target.value)}
+            value={settings.bufferTime}
+            onChange={(e) => update('bufferTime', e.target.value)}
             min="0"
             max="120"
             helperText="Minimum rest/turnover time between back-to-back cases"
@@ -66,8 +142,8 @@ export default function SettingsPage() {
           <Input
             label="Downloadable Window (days)"
             type="number"
-            value={downloadRetention}
-            onChange={(e) => setDownloadRetention(e.target.value)}
+            value={settings.downloadRetention}
+            onChange={(e) => update('downloadRetention', e.target.value)}
             min="1"
             max="90"
             helperText="Number of days schedule sheets remain available for download"
@@ -75,8 +151,8 @@ export default function SettingsPage() {
           <Input
             label="Archive Retention (days)"
             type="number"
-            value={archiveRetention}
-            onChange={(e) => setArchiveRetention(e.target.value)}
+            value={settings.archiveRetention}
+            onChange={(e) => update('archiveRetention', e.target.value)}
             min="7"
             max="365"
             helperText="After this period, data moves to cold storage or is purged"
@@ -84,8 +160,8 @@ export default function SettingsPage() {
           <Input
             label="Purge Warning (hours before)"
             type="number"
-            value={purgeWarningHours}
-            onChange={(e) => setPurgeWarningHours(e.target.value)}
+            value={settings.purgeWarningHours}
+            onChange={(e) => update('purgeWarningHours', e.target.value)}
             min="12"
             max="168"
             helperText="Admin receives notification this many hours before auto-deletion"
@@ -93,8 +169,8 @@ export default function SettingsPage() {
           <label className="flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
-              checked={autoArchive}
-              onChange={(e) => setAutoArchive(e.target.checked)}
+              checked={settings.autoArchive}
+              onChange={(e) => update('autoArchive', e.target.checked)}
               className="w-4 h-4 rounded border-gray-300 text-accent-600 focus:ring-accent-500"
             />
             <div>
@@ -117,20 +193,12 @@ export default function SettingsPage() {
           Notification Settings
         </h3>
         <div className="space-y-3">
-          {[
-            'Booking confirmation',
-            'Approval/denial with reason',
-            'Schedule changes or cancellations',
-            '24-hour reminder to requesting department',
-            '2-hour reminder to requesting department',
-            'Emergency case preemption alerts',
-            'New booking request (Anesthesia)',
-            'Case nearing estimated end time',
-          ].map((item) => (
+          {NOTIFICATION_ITEMS.map((item) => (
             <label key={item} className="flex items-center gap-3 cursor-pointer touch-target">
               <input
                 type="checkbox"
-                defaultChecked
+                checked={isNotifEnabled(item)}
+                onChange={() => toggleNotification(item)}
                 className="w-5 h-5 md:w-4 md:h-4 rounded border-gray-300 text-accent-600 focus:ring-accent-500"
               />
               <span className="text-sm text-gray-700">{item}</span>
@@ -141,8 +209,8 @@ export default function SettingsPage() {
 
       {/* Save button */}
       <div className="flex justify-end">
-        <Button icon={<Save className="w-4 h-4" />} onClick={handleSave}>
-          Save Settings
+        <Button icon={<Save className="w-4 h-4" />} onClick={handleSave} disabled={!isDirty}>
+          {isDirty ? 'Save Settings' : 'Saved'}
         </Button>
       </div>
     </div>

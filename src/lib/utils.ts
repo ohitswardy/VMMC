@@ -80,12 +80,21 @@ export function hasAnesthesiologistConflict(
   return null;
 }
 
-/** Check if booking can be modified (24 hours before) */
+/** Check if booking can be modified (24 hours before, or same-day before noon) */
 export function canModifyBooking(booking: Booking): boolean {
   const bookingDateTime = parseISO(`${booking.date}T${booking.start_time}`);
   const now = new Date();
   const cutoff = addHours(now, 24);
-  return isBefore(cutoff, bookingDateTime);
+
+  // Primary rule: must be at least 24 hours before the booking start
+  if (isBefore(cutoff, bookingDateTime)) return true;
+
+  // Exception: same-day bookings can be modified until 12:00 PM
+  const bookingDay = startOfDay(parseISO(booking.date));
+  const today = startOfDay(now);
+  if (bookingDay.getTime() === today.getTime() && now.getHours() < 12) return true;
+
+  return false;
 }
 
 /**

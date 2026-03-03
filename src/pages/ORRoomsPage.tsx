@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Plus, Edit2, Clock, CalendarClock, UserCheck, Save, X, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Clock, CalendarClock, UserCheck, Save, X, Trash2, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useORRoomsStore } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { upsertNurseDuty, fetchNurseDutyForDate } from '../lib/supabaseService';
@@ -16,9 +33,62 @@ import { format } from 'date-fns';
 
 interface NurseDuty { scrub: string; circ: string; }
 
+/* ────────────────────────────────────────────
+   Sortable wrapper for each OR room card
+   ──────────────────────────────────────────── */
+interface SortableRoomCardProps {
+  room: ORRoom;
+  index: number;
+  isDragEnabled: boolean;
+  children: React.ReactNode;
+}
+
+function SortableRoomCard({ room, index, isDragEnabled, children }: SortableRoomCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: room.id, disabled: !isDragEnabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.85 : 1,
+  };
+
+  return (
+    <motion.div
+      ref={setNodeRef}
+      style={style}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className={`bg-white rounded-[10px] border border-gray-200 overflow-hidden ${isDragging ? 'shadow-xl ring-2 ring-accent-300' : ''}`}
+    >
+      {/* Drag handle - only shown for admins */}
+      {isDragEnabled && (
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex items-center justify-center gap-1 py-1.5 cursor-grab active:cursor-grabbing bg-gray-50 border-b border-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          title="Drag to reorder"
+        >
+          <GripVertical className="w-4 h-4" />
+          <span className="text-[10px] font-medium uppercase tracking-wider">Drag to reorder</span>
+        </div>
+      )}
+      {children}
+    </motion.div>
+  );
+}
+
 export default function ORRoomsPage() {
   const { user } = useAuthStore();
-  const { rooms, addRoom, updateRoom, deleteRoom } = useORRoomsStore();
+  const { rooms, addRoom, updateRoom, deleteRoom, reorderRooms } = useORRoomsStore();
   const [editingRoom, setEditingRoom] = useState<ORRoom | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPriorityOpen, setIsPriorityOpen] = useState(false);
@@ -109,6 +179,32 @@ export default function ORRoomsPage() {
 
   const cancelNurseEdit = () => setEditingNurseRoom(null);
 
+  // ── Drag-and-drop sensors & handler ──
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = rooms.findIndex((r) => r.id === active.id);
+    const newIndex = rooms.findIndex((r) => r.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(rooms, oldIndex, newIndex);
+    const orderedIds = reordered.map((r) => r.id);
+
+    try {
+      await reorderRooms(orderedIds);
+      toast.success('Room order updated.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save room order.');
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deletingRoom) return;
     setIsDeleting(true);
@@ -148,123 +244,121 @@ export default function ORRoomsPage() {
         )}
       </div>
 
-      {/* Rooms Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {rooms.map((room, i) => {
-          const duty = nurseDuty[room.id] || { scrub: '', circ: '' };
-          const isEditingThisRoom = editingNurseRoom === room.id;
+      {/* Rooms Grid – drag-and-drop enabled for admins */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={rooms.map((r) => r.id)} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {rooms.map((room, i) => {
+              const duty = nurseDuty[room.id] || { scrub: '', circ: '' };
+              const isEditingThisRoom = editingNurseRoom === room.id;
 
-          return (
-            <motion.div
-              key={room.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="bg-white rounded-[10px] border border-gray-200 overflow-hidden"
-            >
-              <div className="px-4 md:px-5 py-3 md:py-4 bg-gray-50 border-b border-gray-100">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-gray-900">{room.name}</h3>
-                  <div className={`px-2 py-0.5 rounded-[6px] text-[10px] font-semibold ${room.is_active ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                    {room.is_active ? 'Active' : 'Inactive'}
-                  </div>
-                </div>
-              </div>
-              <div className="px-4 md:px-5 py-3 md:py-4 space-y-3">
-                {/* Room info — hidden from pure nurse role */}
-                {!isNurse && (
-                  <>
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Designation</p>
-                      <p className="text-sm text-gray-700 font-medium">{room.designation}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Buffer: {room.buffer_time_minutes} minutes</span>
-                    </div>
-                  </>
-                )}
-
-                {/* Nurses on Duty section */}
-                {canManageNurses && (
-                  <div className="border-t border-gray-100 pt-3 space-y-2">
+              return (
+                <SortableRoomCard key={room.id} room={room} index={i} isDragEnabled={isAdmin}>
+                  <div className="px-4 md:px-5 py-3 md:py-4 bg-gray-50 border-b border-gray-100">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                        <UserCheck className="w-3 h-3" /> Nurses on Duty
-                      </p>
-                      {!isEditingThisRoom && (
-                        <button
-                          onClick={() => startEditNurse(room.id)}
-                          className="text-[10px] font-medium text-accent-600 hover:text-accent-700 px-1.5 py-0.5 rounded hover:bg-accent-50 transition-colors"
-                        >
-                          {duty.scrub || duty.circ ? 'Edit' : '+ Assign'}
-                        </button>
-                      )}
-                    </div>
-
-                    {isEditingThisRoom ? (
-                      <div className="space-y-2">
-                        <Input
-                          label="Scrub Nurse"
-                          value={nurseForm.scrub}
-                          onChange={(e) => setNurseForm((p) => ({ ...p, scrub: e.target.value }))}
-                          placeholder="Nurse Name"
-                        />
-                        <Input
-                          label="CN / NA"
-                          value={nurseForm.circ}
-                          onChange={(e) => setNurseForm((p) => ({ ...p, circ: e.target.value }))}
-                          placeholder="Nurse Name"
-                        />
-                        <div className="flex gap-2 pt-1">
-                          <Button
-                            variant="primary" size="sm" type="button"
-                            icon={<Save className="w-3 h-3" />}
-                            onClick={() => saveNurse(room.id)}
-                          >
-                            Save
-                          </Button>
-                          <Button variant="ghost" size="sm" type="button" icon={<X className="w-3 h-3" />} onClick={cancelNurseEdit}>
-                            Cancel
-                          </Button>
-                        </div>
+                      <h3 className="text-lg font-bold text-gray-900">{room.name}</h3>
+                      <div className={`px-2 py-0.5 rounded-[6px] text-[10px] font-semibold ${room.is_active ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                        {room.is_active ? 'Active' : 'Inactive'}
                       </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Scrub</span>
-                          <span className="text-gray-700 font-medium">{duty.scrub || <span className="text-gray-300 italic">Unassigned</span>}</span>
+                    </div>
+                  </div>
+                  <div className="px-4 md:px-5 py-3 md:py-4 space-y-3">
+                    {/* Room info — hidden from pure nurse role */}
+                    {!isNurse && (
+                      <>
+                        <div>
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Designation</p>
+                          <p className="text-sm text-gray-700 font-medium">{room.designation}</p>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">CN / NA</span>
-                          <span className="text-gray-700 font-medium">{duty.circ || <span className="text-gray-300 italic">Unassigned</span>}</span>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Buffer: {room.buffer_time_minutes} minutes</span>
                         </div>
+                      </>
+                    )}
+
+                    {/* Nurses on Duty section */}
+                    {canManageNurses && (
+                      <div className="border-t border-gray-100 pt-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                            <UserCheck className="w-3 h-3" /> Nurses on Duty
+                          </p>
+                          {!isEditingThisRoom && (
+                            <button
+                              onClick={() => startEditNurse(room.id)}
+                              className="text-[10px] font-medium text-accent-600 hover:text-accent-700 px-1.5 py-0.5 rounded hover:bg-accent-50 transition-colors"
+                            >
+                              {duty.scrub || duty.circ ? 'Edit' : '+ Assign'}
+                            </button>
+                          )}
+                        </div>
+
+                        {isEditingThisRoom ? (
+                          <div className="space-y-2">
+                            <Input
+                              label="Scrub Nurse"
+                              value={nurseForm.scrub}
+                              onChange={(e) => setNurseForm((p) => ({ ...p, scrub: e.target.value }))}
+                              placeholder="Nurse Name"
+                            />
+                            <Input
+                              label="CN / NA"
+                              value={nurseForm.circ}
+                              onChange={(e) => setNurseForm((p) => ({ ...p, circ: e.target.value }))}
+                              placeholder="Nurse Name"
+                            />
+                            <div className="flex gap-2 pt-1">
+                              <Button
+                                variant="primary" size="sm" type="button"
+                                icon={<Save className="w-3 h-3" />}
+                                onClick={() => saveNurse(room.id)}
+                              >
+                                Save
+                              </Button>
+                              <Button variant="ghost" size="sm" type="button" icon={<X className="w-3 h-3" />} onClick={cancelNurseEdit}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">Scrub</span>
+                              <span className="text-gray-700 font-medium">{duty.scrub || <span className="text-gray-300 italic">Unassigned</span>}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">CN / NA</span>
+                              <span className="text-gray-700 font-medium">{duty.circ || <span className="text-gray-300 italic">Unassigned</span>}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Admin-only Edit Room button */}
+                    {isAdmin && !isEditingThisRoom && (
+                      <div className="flex gap-2 pt-1">
+                        <Button variant="secondary" size="sm" icon={<Edit2 className="w-3.5 h-3.5" />} onClick={() => openEditModal(room)}>
+                          Edit
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          icon={<Trash2 className="w-3.5 h-3.5" />}
+                          onClick={() => setDeletingRoom(room)}
+                        >
+                          Delete
+                        </Button>
                       </div>
                     )}
                   </div>
-                )}
-
-                {/* Admin-only Edit Room button */}
-                {isAdmin && !isEditingThisRoom && (
-                  <div className="flex gap-2 pt-1">
-                    <Button variant="secondary" size="sm" icon={<Edit2 className="w-3.5 h-3.5" />} onClick={() => openEditModal(room)}>
-                      Edit
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      icon={<Trash2 className="w-3.5 h-3.5" />}
-                      onClick={() => setDeletingRoom(room)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+                </SortableRoomCard>
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Add OR Room button — admin only */}
       {isAdmin && (

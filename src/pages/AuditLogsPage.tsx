@@ -1,18 +1,52 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Search } from 'lucide-react';
+import { Shield, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DatePicker } from '../components/ui/DatePicker';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import { useAuditLogsStore } from '../stores/appStore';
 import PageHelpButton from '../components/ui/PageHelpButton';
 import { AUDIT_LOGS_HELP } from '../lib/helpContent';
 
+const PAGE_SIZE = 25;
+
+/** Human-readable field name */
+function humanField(key: string): string {
+  return key.replace(/_/g, ' ').replace(/\bid\b/g, 'ID').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Render a human-readable diff from old/new value objects */
+function renderDiff(oldVals: Record<string, unknown> | null, newVals: Record<string, unknown> | null) {
+  const allKeys = new Set<string>([
+    ...Object.keys(oldVals || {}),
+    ...Object.keys(newVals || {}),
+  ]);
+  if (allKeys.size === 0) return null;
+  return (
+    <div className="space-y-1">
+      {Array.from(allKeys).map((key) => {
+        const oldV = oldVals?.[key];
+        const newV = newVals?.[key];
+        if (oldV === newV) return null;
+        return (
+          <div key={key} className="text-xs">
+            <span className="font-medium text-gray-600">{humanField(key)}: </span>
+            {oldV !== undefined && <span className="text-red-500 line-through mr-1">{String(oldV)}</span>}
+            {newV !== undefined && <span className="text-emerald-600">{String(newV)}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AuditLogsPage() {
   const { logs } = useAuditLogsStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [dateEndFilter, setDateEndFilter] = useState('');
   const [userFilter, setUserFilter] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+  const [page, setPage] = useState(1);
 
   // Build user options from joined profile data in logs
   const userOptions = useMemo(() => {
@@ -33,11 +67,26 @@ export default function AuditLogsPage() {
         (l) => l.action.toLowerCase().includes(term) || l.entity_type.toLowerCase().includes(term)
       );
     }
-    if (dateFilter) result = result.filter((l) => l.created_at.startsWith(dateFilter));
+    if (dateFilter) {
+      if (dateEndFilter) {
+        result = result.filter((l) => l.created_at.slice(0, 10) >= dateFilter && l.created_at.slice(0, 10) <= dateEndFilter);
+      } else {
+        result = result.filter((l) => l.created_at.startsWith(dateFilter));
+      }
+    }
     if (userFilter) result = result.filter((l) => l.user_id === userFilter);
     if (actionFilter) result = result.filter((l) => l.action.startsWith(actionFilter));
     return result;
-  }, [logs, searchTerm, dateFilter, userFilter, actionFilter]);
+  }, [logs, searchTerm, dateFilter, dateEndFilter, userFilter, actionFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
+  // Reset page when filters change
+  useMemo(() => { setPage(1); }, [searchTerm, dateFilter, dateEndFilter, userFilter, actionFilter]);
 
   const getActionBadge = (action: string) => {
     if (action.includes('create')) return { bg: 'bg-emerald-50', text: 'text-emerald-700' };
@@ -85,7 +134,12 @@ export default function AuditLogsPage() {
           <DatePicker
             value={dateFilter}
             onChange={(val) => setDateFilter(val)}
-            placeholder="Filter by date"
+            placeholder="From date"
+          />
+          <DatePicker
+            value={dateEndFilter}
+            onChange={(val) => setDateEndFilter(val)}
+            placeholder="To date"
           />
           <CustomSelect
             value={userFilter}
@@ -111,7 +165,7 @@ export default function AuditLogsPage() {
       <div className="bg-white rounded-[10px] border border-gray-200 overflow-hidden">
         {/* ─── Mobile: Card list ─── */}
         <div className="md:hidden divide-y divide-gray-100">
-          {filtered.map((log, i) => {
+          {paginated.map((log, i) => {
             const badge = getActionBadge(log.action);
             return (
               <motion.div
@@ -135,9 +189,8 @@ export default function AuditLogsPage() {
                     <p className="text-xs text-gray-500">{log.entity_type} {log.entity_id ? `#${log.entity_id}` : ''}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">{new Date(log.created_at).toLocaleString()}</p>
                     {(log.old_values || log.new_values) && (
-                      <div className="mt-1.5 text-[10px] bg-gray-50 rounded-[6px] p-2 space-y-0.5">
-                        {log.old_values && <p className="text-red-500 truncate">- {JSON.stringify(log.old_values)}</p>}
-                        {log.new_values && <p className="text-emerald-500 truncate">+ {JSON.stringify(log.new_values)}</p>}
+                      <div className="mt-1.5 text-[10px] bg-gray-50 rounded-[6px] p-2">
+                        {renderDiff(log.old_values as Record<string, unknown> | null, log.new_values as Record<string, unknown> | null)}
                       </div>
                     )}
                   </div>
@@ -160,7 +213,7 @@ export default function AuditLogsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((log, i) => {
+              {paginated.map((log, i) => {
                 const badge = getActionBadge(log.action);
                 return (
                   <motion.tr
@@ -183,9 +236,8 @@ export default function AuditLogsPage() {
                       <span className={`px-2 py-1 rounded-[6px] text-xs font-medium ${badge.bg} ${badge.text}`}>{log.action}</span>
                     </td>
                     <td className="px-6 py-3 text-sm text-gray-500">{log.entity_type} {log.entity_id ? `#${log.entity_id}` : ''}</td>
-                    <td className="px-6 py-3 text-xs text-gray-500 max-w-[300px]">
-                      {log.old_values && <span className="text-red-500">- {JSON.stringify(log.old_values)}</span>}
-                      {log.new_values && <span className="text-emerald-500 block">+ {JSON.stringify(log.new_values)}</span>}
+                    <td className="px-6 py-3 max-w-[300px]">
+                      {renderDiff(log.old_values as Record<string, unknown> | null, log.new_values as Record<string, unknown> | null)}
                     </td>
                   </motion.tr>
                 );
@@ -196,6 +248,34 @@ export default function AuditLogsPage() {
 
         {filtered.length === 0 && (
           <div className="px-4 py-12 text-center text-sm text-gray-400">No log entries found.</div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 md:px-6 py-3 border-t border-gray-100">
+            <span className="text-xs text-gray-400">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4 text-gray-500" />
+              </button>
+              <span className="text-xs font-medium text-gray-600 px-2">
+                {page} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

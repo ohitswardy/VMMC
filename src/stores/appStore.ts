@@ -5,7 +5,7 @@ import type { ORRoomStatus } from '../lib/constants';
 import { DEFAULT_OR_PRIORITY_SCHEDULE } from '../lib/constants';
 import {
   fetchBookings, createBooking, updateBookingDB,
-  fetchORRooms, createORRoom, updateORRoom, deleteORRoom,
+  fetchORRooms, createORRoom, updateORRoom, deleteORRoom, reorderORRooms,
   fetchLiveStatuses, upsertLiveStatus,
   fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification,
   fetchAuditLogs,
@@ -103,6 +103,7 @@ interface ORRoomsState {
   addRoom: (room: Omit<ORRoom, 'id' | 'created_at' | 'updated_at'>) => Promise<ORRoom>;
   updateRoom: (id: string, updates: Partial<ORRoom>) => Promise<void>;
   deleteRoom: (id: string) => Promise<void>;
+  reorderRooms: (orderedIds: string[]) => Promise<void>;
   loadLiveStatuses: () => Promise<void>;
   setLiveStatus: (roomId: string, status: ORRoomStatus, bookingId?: string | null) => Promise<void>;
   setAllLiveStatuses: (statuses: Record<string, ORRoomLiveStatus>) => void;
@@ -141,6 +142,21 @@ export const useORRoomsStore = create<ORRoomsState>((set) => ({
   deleteRoom: async (id) => {
     await deleteORRoom(id);
     set((s) => ({ rooms: s.rooms.filter((r) => r.id !== id) }));
+  },
+
+  reorderRooms: async (orderedIds) => {
+    // Optimistic reorder: remap rooms array to match new order with updated numbers
+    set((s) => {
+      const roomMap = new Map(s.rooms.map((r) => [r.id, r]));
+      const reordered = orderedIds
+        .map((id, idx) => {
+          const room = roomMap.get(id);
+          return room ? { ...room, number: idx + 1 } : null;
+        })
+        .filter(Boolean) as ORRoom[];
+      return { rooms: reordered };
+    });
+    await reorderORRooms(orderedIds);
   },
 
   loadLiveStatuses: async () => {

@@ -106,10 +106,9 @@ export default function ReportsPage() {
           </div>
           <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.avgUtilization}%</p>
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
-              <ArrowUpRight className="w-3 h-3" /> 4.2%
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-500">
+              all rooms
             </span>
-            <span className="text-[10px] text-gray-400">vs last week</span>
           </div>
           <div className="mt-3 -mx-1 -mb-1">
             <ResponsiveContainer width="100%" height={48}>
@@ -136,10 +135,9 @@ export default function ReportsPage() {
           </div>
           <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.totalCases}</p>
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
-              <ArrowUpRight className="w-3 h-3" /> 12%
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-500">
+              all time
             </span>
-            <span className="text-[10px] text-gray-400">vs last week</span>
           </div>
           <div className="mt-3 -mx-1 -mb-1">
             <ResponsiveContainer width="100%" height={48}>
@@ -159,16 +157,14 @@ export default function ReportsPage() {
           </div>
           <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.cancellationRate}%</p>
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
-              <ArrowDownRight className="w-3 h-3" /> 2.1%
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-500">
+              of total cases
             </span>
-            <span className="text-[10px] text-gray-400">vs last week</span>
           </div>
           <div className="mt-3 -mx-1 -mb-1">
             <ResponsiveContainer width="100%" height={48}>
               <AreaChart data={[
-                { d: 1, v: 5 }, { d: 2, v: 3 }, { d: 3, v: 4 }, { d: 4, v: 2 },
-                { d: 5, v: 3 }, { d: 6, v: 1 }, { d: 7, v: 0 },
+                { d: 1, v: stats.cancellationRate },
               ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="cancelFill" x1="0" y1="0" x2="0" y2="1">
@@ -193,15 +189,13 @@ export default function ReportsPage() {
           <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.emergencyRatio}%</p>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-500">
-              — 0%
+              of total cases
             </span>
-            <span className="text-[10px] text-gray-400">no change</span>
           </div>
           <div className="mt-3 -mx-1 -mb-1">
             <ResponsiveContainer width="100%" height={48}>
               <LineChart data={[
-                { d: 1, v: 0 }, { d: 2, v: 1 }, { d: 3, v: 0 }, { d: 4, v: 0 },
-                { d: 5, v: 1 }, { d: 6, v: 0 }, { d: 7, v: 0 },
+                { d: 1, v: stats.emergencyRatio },
               ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                 <Line type="stepAfter" dataKey="v" stroke="#ef4444" strokeWidth={2} dot={false} />
               </LineChart>

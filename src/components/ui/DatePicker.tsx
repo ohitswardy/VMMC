@@ -7,10 +7,12 @@ import {
   endOfWeek,
   addMonths,
   subMonths,
+  addDays,
   eachDayOfInterval,
   isSameMonth,
   isSameDay,
   isToday,
+  isBefore,
   parse,
 } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -48,6 +50,7 @@ export function DatePicker({
   });
   const containerRef = useRef<HTMLDivElement>(null);
   const [direction, setDirection] = useState(0);
+  const [focusedDay, setFocusedDay] = useState<Date | null>(null);
 
   const selectedDate = value ? parse(value, 'yyyy-MM-dd', new Date()) : null;
 
@@ -95,6 +98,67 @@ export function DatePicker({
       setIsOpen(false);
     },
     [onChange]
+  );
+
+  // Keyboard navigation within the calendar grid
+  const handleGridKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const base = focusedDay || selectedDate || new Date();
+      let next: Date | null = null;
+
+      switch (e.key) {
+        case 'ArrowRight':
+          e.preventDefault();
+          next = addDays(base, 1);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          next = addDays(base, -1);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          next = addDays(base, 7);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          next = addDays(base, -7);
+          break;
+        case 'Home':
+          e.preventDefault();
+          next = startOfMonth(base);
+          break;
+        case 'End':
+          e.preventDefault();
+          next = endOfMonth(base);
+          break;
+        case 'PageDown':
+          e.preventDefault();
+          goToNextMonth();
+          return;
+        case 'PageUp':
+          e.preventDefault();
+          goToPrevMonth();
+          return;
+        case 'Enter':
+        case ' ':
+          e.preventDefault();
+          if (base && !(minDate && isBefore(base, minDate))) {
+            selectDate(base);
+          }
+          return;
+        default:
+          return;
+      }
+
+      if (next) {
+        setFocusedDay(next);
+        if (!isSameMonth(next, currentMonth)) {
+          setDirection(isBefore(next, currentMonth) ? -1 : 1);
+          setCurrentMonth(next);
+        }
+      }
+    },
+    [focusedDay, selectedDate, currentMonth, minDate, goToNextMonth, goToPrevMonth, selectDate]
   );
 
   // Build calendar grid
@@ -191,12 +255,17 @@ export function DatePicker({
                 exit="exit"
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
                 className="grid grid-cols-7"
+                role="grid"
+                aria-label="Calendar"
+                tabIndex={0}
+                onKeyDown={handleGridKeyDown}
               >
                 {calendarDays.map((day) => {
                   const inMonth = isSameMonth(day, currentMonth);
                   const selected = selectedDate && isSameDay(day, selectedDate);
                   const today = isToday(day);
-                  const isPast = minDate ? day < minDate : false;
+                  const isPast = minDate ? isBefore(day, minDate) : false;
+                  const isFocused = focusedDay && isSameDay(day, focusedDay);
 
                   return (
                     <button
@@ -204,6 +273,10 @@ export function DatePicker({
                       type="button"
                       disabled={isPast}
                       onClick={() => selectDate(day)}
+                      tabIndex={-1}
+                      role="gridcell"
+                      aria-selected={!!selected}
+                      aria-label={format(day, 'EEEE, MMMM d, yyyy')}
                       className={`
                         h-9 w-full flex items-center justify-center text-[13px] rounded-lg transition-all duration-100
                         ${!inMonth ? 'text-gray-300' : 'text-gray-700'}
@@ -211,6 +284,7 @@ export function DatePicker({
                         ${!selected && today ? 'font-semibold text-accent-600' : ''}
                         ${!selected && inMonth && !isPast ? 'hover:bg-accent-50 hover:text-accent-700' : ''}
                         ${isPast ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                        ${isFocused && !selected ? 'ring-2 ring-accent-400 ring-inset' : ''}
                       `}
                     >
                       {format(day, 'd')}

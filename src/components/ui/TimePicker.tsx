@@ -155,6 +155,7 @@ export function TimePicker({
                 <button
                   type="button"
                   onClick={incHour}
+                  aria-label="Increase hour"
                   className="w-10 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <ChevronUp className="w-4 h-4" />
@@ -165,6 +166,7 @@ export function TimePicker({
                 <button
                   type="button"
                   onClick={decHour}
+                  aria-label="Decrease hour"
                   className="w-10 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <ChevronDown className="w-4 h-4" />
@@ -179,6 +181,7 @@ export function TimePicker({
                 <button
                   type="button"
                   onClick={incMinute}
+                  aria-label="Increase minute"
                   className="w-10 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <ChevronUp className="w-4 h-4" />
@@ -189,6 +192,7 @@ export function TimePicker({
                 <button
                   type="button"
                   onClick={decMinute}
+                  aria-label="Decrease minute"
                   className="w-10 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <ChevronDown className="w-4 h-4" />

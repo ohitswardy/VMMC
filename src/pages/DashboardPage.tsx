@@ -95,6 +95,26 @@ export default function DashboardPage() {
     };
   }, [bookings]);
 
+  // Generate real sparkline data from the last 7 days of bookings
+  const sparklineData = useMemo(() => {
+    const days: { d: string; total: number; pending: number; ongoing: number; completed: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      const dayLabel = format(d, 'EEE').charAt(0);
+      const dayBookings = bookings.filter((b) => b.date === dateStr);
+      days.push({
+        d: dayLabel,
+        total: dayBookings.length,
+        pending: dayBookings.filter((b) => b.status === 'pending').length,
+        ongoing: dayBookings.filter((b) => b.status === 'ongoing').length,
+        completed: dayBookings.filter((b) => b.status === 'completed').length,
+      });
+    }
+    return days;
+  }, [bookings]);
+
   const filtered = useMemo(() => {
     let result = bookings;
     if (statusFilter !== 'all') result = result.filter((b) => b.status === statusFilter);
@@ -187,18 +207,14 @@ export default function DashboardPage() {
           </div>
           <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.total}</p>
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
-              <ArrowUpRight className="w-3 h-3" /> 8%
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-500">
+              today
             </span>
-            <span className="text-[10px] text-gray-400">vs yesterday</span>
           </div>
           <div className="mt-3 -mx-1 -mb-1">
             <ResponsiveContainer width="100%" height={48}>
-              <BarChart data={[
-                { d: 'M', v: 5 }, { d: 'T', v: 7 }, { d: 'W', v: 4 }, { d: 'T', v: 6 },
-                { d: 'F', v: 8 }, { d: 'S', v: 3 }, { d: 'S', v: stats.total },
-              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-                <Bar dataKey="v" fill="#6366f1" radius={[3, 3, 0, 0]} opacity={0.85} />
+              <BarChart data={sparklineData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <Bar dataKey="total" fill="#6366f1" radius={[3, 3, 0, 0]} opacity={0.85} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -214,23 +230,19 @@ export default function DashboardPage() {
           <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.pending}</p>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700">
-              <ArrowUpRight className="w-3 h-3" /> 2
+              awaiting review
             </span>
-            <span className="text-[10px] text-gray-400">new today</span>
           </div>
           <div className="mt-3 -mx-1 -mb-1">
             <ResponsiveContainer width="100%" height={48}>
-              <AreaChart data={[
-                { d: 1, v: 3 }, { d: 2, v: 5 }, { d: 3, v: 2 }, { d: 4, v: 4 },
-                { d: 5, v: 3 }, { d: 6, v: 1 }, { d: 7, v: stats.pending },
-              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <AreaChart data={sparklineData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="pendingFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.2} />
                     <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="v" stroke="#f59e0b" strokeWidth={2}
+                <Area type="monotone" dataKey="pending" stroke="#f59e0b" strokeWidth={2}
                   fill="url(#pendingFill)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
@@ -247,23 +259,19 @@ export default function DashboardPage() {
           <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.ongoing}</p>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700">
-              <ArrowUpRight className="w-3 h-3" /> 1
+              in progress
             </span>
-            <span className="text-[10px] text-gray-400">active now</span>
           </div>
           <div className="mt-3 -mx-1 -mb-1">
             <ResponsiveContainer width="100%" height={48}>
-              <AreaChart data={[
-                { d: 1, v: 1 }, { d: 2, v: 2 }, { d: 3, v: 3 }, { d: 4, v: 2 },
-                { d: 5, v: 4 }, { d: 6, v: 3 }, { d: 7, v: stats.ongoing },
-              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <AreaChart data={sparklineData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="ongoingFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" stopOpacity={0.2} />
                     <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="v" stroke="#10b981" strokeWidth={2}
+                <Area type="monotone" dataKey="ongoing" stroke="#10b981" strokeWidth={2}
                   fill="url(#ongoingFill)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
@@ -280,23 +288,19 @@ export default function DashboardPage() {
           <p className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{stats.completed}</p>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700">
-              <ArrowUpRight className="w-3 h-3" /> 15%
+              today
             </span>
-            <span className="text-[10px] text-gray-400">vs last week</span>
           </div>
           <div className="mt-3 -mx-1 -mb-1">
             <ResponsiveContainer width="100%" height={48}>
-              <AreaChart data={[
-                { d: 1, v: 4 }, { d: 2, v: 6 }, { d: 3, v: 5 }, { d: 4, v: 7 },
-                { d: 5, v: 8 }, { d: 6, v: 6 }, { d: 7, v: stats.completed || 1 },
-              ]} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <AreaChart data={sparklineData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="completedFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
                     <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="v" stroke="#3b82f6" strokeWidth={2}
+                <Area type="monotone" dataKey="completed" stroke="#3b82f6" strokeWidth={2}
                   fill="url(#completedFill)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>

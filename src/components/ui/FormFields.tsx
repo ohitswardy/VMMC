@@ -57,6 +57,8 @@ export function Select({ label, error, options, placeholder, className = '', id,
           ${error ? '!border-red-300 focus:!ring-red-100 focus:!border-red-400' : ''}
           ${className}
         `}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${selectId}-error` : undefined}
         {...props}
       >
         {placeholder && <option value="">{placeholder}</option>}
@@ -64,7 +66,7 @@ export function Select({ label, error, options, placeholder, className = '', id,
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && <p id={`${selectId}-error`} className="text-xs text-red-500 mt-1">{error}</p>}
     </div>
   );
 }
@@ -72,10 +74,12 @@ export function Select({ label, error, options, placeholder, className = '', id,
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
+  showCharCount?: boolean;
 }
 
-export function Textarea({ label, error, className = '', id, ...props }: TextareaProps) {
+export function Textarea({ label, error, showCharCount, className = '', id, ...props }: TextareaProps) {
   const textareaId = id || label?.toLowerCase().replace(/\s+/g, '-');
+  const charCount = typeof props.value === 'string' ? props.value.length : 0;
   return (
     <div className="space-y-1.5">
       {label && (
@@ -91,9 +95,18 @@ export function Textarea({ label, error, className = '', id, ...props }: Textare
           ${error ? '!border-red-300 focus:!ring-red-100 focus:!border-red-400' : ''}
           ${className}
         `}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${textareaId}-error` : undefined}
         {...props}
       />
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      <div className="flex items-center justify-between">
+        {error ? <p id={`${textareaId}-error`} className="text-xs text-red-500">{error}</p> : <span />}
+        {(showCharCount || props.maxLength) && (
+          <span className={`text-[10px] ${props.maxLength && charCount >= props.maxLength ? 'text-red-500' : 'text-gray-400'}`}>
+            {charCount}{props.maxLength ? `/${props.maxLength}` : ''}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

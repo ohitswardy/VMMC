@@ -292,6 +292,8 @@ export default function BookingsPage() {
   const [showPendingPanel, setShowPendingPanel] = useState(false);
   const [panelApprovingId, setPanelApprovingId] = useState<string | null>(null);
   const [panelDenyingId, setPanelDenyingId] = useState<string | null>(null);
+  const [panelDenyReasonId, setPanelDenyReasonId] = useState<string | null>(null);
+  const [panelDenyReason, setPanelDenyReason] = useState('');
   const [selectedChangeRequest, setSelectedChangeRequest] = useState<BookingChangeRequest | null>(null);
   const [crModalDenying, setCrModalDenying] = useState(false);
   const [crModalDenyReason, setCrModalDenyReason] = useState('');
@@ -334,10 +336,16 @@ export default function BookingsPage() {
   };
 
   const handlePanelDeny = async (id: string) => {
+    if (!panelDenyReason.trim()) {
+      toast.error('Please enter a denial reason.');
+      return;
+    }
     setPanelDenyingId(id);
     try {
-      await updateBooking(id, { status: 'denied' });
+      await updateBooking(id, { status: 'denied', denial_reason: panelDenyReason.trim() });
       toast.success('Booking denied');
+      setPanelDenyReasonId(null);
+      setPanelDenyReason('');
     } catch { toast.error('Failed to deny'); }
     finally { setPanelDenyingId(null); }
   };
@@ -973,7 +981,7 @@ export default function BookingsPage() {
                             Approve
                           </button>
                           <button
-                            onClick={() => handlePanelDeny(b.id)}
+                            onClick={() => { setPanelDenyReasonId(panelDenyReasonId === b.id ? null : b.id); setPanelDenyReason(''); }}
                             disabled={isApproving || isDenying}
                             className="flex-1 py-1.5 rounded-lg text-[12px] font-semibold border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
                           >
@@ -985,6 +993,34 @@ export default function BookingsPage() {
                             Deny
                           </button>
                         </div>
+                        {/* Deny reason input */}
+                        {panelDenyReasonId === b.id && (
+                          <div className="mt-2 ml-4 space-y-2 p-3 rounded-lg bg-red-50 border border-red-100">
+                            <textarea
+                              value={panelDenyReason}
+                              onChange={(e) => setPanelDenyReason(e.target.value)}
+                              placeholder="Enter reason for denial..."
+                              rows={2}
+                              className="w-full text-xs border border-red-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-200 bg-white text-gray-700 placeholder:text-gray-400"
+                              autoFocus
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => { setPanelDenyReasonId(null); setPanelDenyReason(''); }}
+                                className="px-3 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handlePanelDeny(b.id)}
+                                disabled={isDenying}
+                                className="px-3 py-1 text-[11px] font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md disabled:opacity-50 transition-colors"
+                              >
+                                Confirm Deny
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Clock, User, Stethoscope, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { Activity, Clock, User, Stethoscope, AlertCircle, CheckCircle2, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
+import { format, differenceInMinutes } from 'date-fns';
 import { useBookingsStore, useORRoomsStore } from '../stores/appStore';
 import { getDeptColor, getDeptName, formatTime, getRoomStatusInfo } from '../lib/utils';
 import { useAuthStore } from '../stores/authStore';
@@ -48,6 +48,42 @@ export default function LiveBoardPage() {
     from: ORRoomStatus;
     to: ORRoomStatus;
   } | null>(null);
+
+  // Kiosk / fullscreen mode
+  const [isKiosk, setIsKiosk] = useState(false);
+
+  // Elapsed timer tick (re-renders every 30s for ongoing case timers)
+  const [, setTick] = useState(0);
+
+  // Auto-refresh polling — reload bookings & live statuses every 30 seconds
+  const { loadBookings } = useBookingsStore();
+  const { loadLiveStatuses } = useORRoomsStore();
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadBookings();
+      loadLiveStatuses();
+      setTick((t) => t + 1); // trigger elapsed time re-render
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [loadBookings, loadLiveStatuses]);
+
+  // Fullscreen toggle
+  const toggleKiosk = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+      setIsKiosk(true);
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+      setIsKiosk(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsKiosk(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   const requestStatusChange = (roomId: string, roomName: string, from: ORRoomStatus, to: ORRoomStatus) => {
     if (from === to) return;
@@ -130,6 +166,16 @@ export default function LiveBoardPage() {
       default:
         return { emptyMessage: 'No active case' };
     }
+  };
+
+  /** Format elapsed time for an ongoing case */
+  const getElapsedLabel = (booking: Booking): string => {
+    const startDateTime = new Date(`${booking.date}T${booking.start_time}`);
+    const mins = differenceInMinutes(new Date(), startDateTime);
+    if (mins < 0) return '';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m elapsed` : `${m}m elapsed`;
   };
 
   /** Contextual description of what a status change will do */
@@ -228,7 +274,25 @@ export default function LiveBoardPage() {
           </div>
           <PageHelpButton {...LIVE_BOARD_HELP} />
         </div>
-        <div className="flex items-center gap-3 text-[11px] md:text-xs flex-shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+          <button
+            onClick={() => { loadBookings(); loadLiveStatuses(); }}
+            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+            title="Refresh now"
+          >
+            <RefreshCw className="w-4 h-4 text-gray-500" />
+          </button>
+          <button
+            onClick={toggleKiosk}
+            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+            title={isKiosk ? 'Exit fullscreen' : 'Kiosk mode'}
+          >
+            {isKiosk ? <Minimize2 className="w-4 h-4 text-gray-500" /> : <Maximize2 className="w-4 h-4 text-gray-500" />}
+          </button>
+        </div>
+      </div>
+      {/* Legend */}
+      <div className="flex items-center gap-3 text-[11px] md:text-xs flex-shrink-0 flex-wrap">
           <span className="flex items-center gap-1.5 text-blue-600">
             <span className="w-2 h-2 rounded-full bg-blue-400" /> Idle
           </span>
@@ -245,7 +309,6 @@ export default function LiveBoardPage() {
             <span className="w-2 h-2 rounded-full bg-red-400" /> Deferred
           </span>
         </div>
-      </div>
 
       {/* Room Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
@@ -321,6 +384,12 @@ export default function LiveBoardPage() {
                         <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                         <span>{formatTime(displayBooking.start_time)} – {formatTime(displayBooking.end_time)}</span>
                       </div>
+                      {contextKey === 'ongoing' && (
+                        <div className="flex items-center gap-2 text-emerald-600 font-medium">
+                          <Activity className="w-3.5 h-3.5 flex-shrink-0 animate-pulse" />
+                          <span>{getElapsedLabel(displayBooking)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : emptyMessage ? (

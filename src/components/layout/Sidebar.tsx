@@ -68,12 +68,13 @@ export default function Sidebar() {
                     <NavLink
                       key={item.to}
                       to={item.to}
-                      className="flex-1 flex items-center justify-center py-3 touch-target"
+                      aria-label={item.label}
+                      className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 touch-target"
                     >
                       <div className="relative">
                         <Icon
-                          className={`w-7 h-7 transition-colors duration-150 ${
-                            isActive ? 'text-accent-600' : 'text-gray-600'
+                          className={`w-6 h-6 transition-colors duration-150 ${
+                            isActive ? 'text-accent-600' : 'text-gray-500'
                           }`}
                           strokeWidth={isActive ? 2.2 : 1.8}
                         />
@@ -83,15 +84,20 @@ export default function Sidebar() {
                           </span>
                         )}
                       </div>
+                      <span className={`text-[10px] leading-none font-medium transition-colors duration-150 ${
+                        isActive ? 'text-accent-600' : 'text-gray-400'
+                      }`}>{item.label}</span>
                     </NavLink>
                   );
                 })}
                 {/* Menu toggle */}
                 <button
                   onClick={() => setDrawerOpen(true)}
-                  className="flex-1 flex items-center justify-center py-3 touch-target"
+                  aria-label="Open menu"
+                  className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 touch-target"
                 >
-                  <Menu className="w-7 h-7 text-gray-600" strokeWidth={1.8} />
+                  <Menu className="w-6 h-6 text-gray-500" strokeWidth={1.8} />
+                  <span className="text-[10px] leading-none font-medium text-gray-400">More</span>
                 </button>
               </div>
             </div>

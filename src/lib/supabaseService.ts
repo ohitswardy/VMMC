@@ -110,6 +110,27 @@ export async function deleteORRoom(id: string) {
   if (error) throw error;
 }
 
+/** Batch-update the `number` (sort order) field for multiple rooms at once.
+ *  Uses a two-pass approach to avoid UNIQUE constraint violations on `number`:
+ *  Pass 1 → set all to unique negative values, Pass 2 → set final positive values. */
+export async function reorderORRooms(orderedIds: string[]) {
+  // Pass 1: move all to unique negative values to clear the UNIQUE constraint
+  const toNegative = orderedIds.map((id, idx) =>
+    supabase.from('or_rooms').update({ number: -(idx + 1) }).eq('id', id)
+  );
+  const negResults = await Promise.all(toNegative);
+  const negFailed = negResults.find(r => r.error);
+  if (negFailed?.error) throw negFailed.error;
+
+  // Pass 2: set final positive order values
+  const toPositive = orderedIds.map((id, idx) =>
+    supabase.from('or_rooms').update({ number: idx + 1 }).eq('id', id)
+  );
+  const posResults = await Promise.all(toPositive);
+  const posFailed = posResults.find(r => r.error);
+  if (posFailed?.error) throw posFailed.error;
+}
+
 // ═════════════════════════════════════════════
 // OR ROOM LIVE STATUS
 // ═════════════════════════════════════════════

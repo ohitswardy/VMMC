@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { fetchAllProfiles, updateProfile } from '../lib/supabaseService';
 import { supabase } from '../lib/supabase';
@@ -40,6 +40,36 @@ export default function UsersPage() {
   }, []);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  // ── Search / Filter / Pagination ──
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [usersPage, setUsersPage] = useState(1);
+  const USERS_PER_PAGE = 20;
+
+  const filteredUsers = useMemo(() => {
+    let result = users;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(
+        (u) =>
+          u.full_name.toLowerCase().includes(term) ||
+          u.email.toLowerCase().includes(term) ||
+          (u.department_id && getDeptName(u.department_id as DepartmentId).toLowerCase().includes(term))
+      );
+    }
+    if (roleFilter) result = result.filter((u) => u.role === roleFilter);
+    return result;
+  }, [users, searchTerm, roleFilter]);
+
+  const totalUserPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const paginatedUsers = useMemo(() => {
+    const start = (usersPage - 1) * USERS_PER_PAGE;
+    return filteredUsers.slice(start, start + USERS_PER_PAGE);
+  }, [filteredUsers, usersPage]);
+
+  // Reset page on filter change
+  useEffect(() => { setUsersPage(1); }, [searchTerm, roleFilter]);
 
   // ── Open modal for editing ──
   const openEdit = (u: UserProfile) => {
@@ -156,9 +186,34 @@ export default function UsersPage() {
       {/* Users */}
       <div className="bg-white rounded-[10px] border border-gray-200 overflow-hidden">
 
+        {/* Search & filter bar */}
+        <div className="px-4 md:px-5 py-3 border-b border-gray-100 space-y-2 md:space-y-0 md:flex md:items-center md:gap-3">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search users..."
+              className="w-full py-2.5 md:py-2 input-base"
+              style={{ paddingLeft: '2.25rem' }}
+            />
+          </div>
+          <CustomSelect
+            value={roleFilter}
+            onChange={(val) => setRoleFilter(val)}
+            options={[
+              { value: '', label: 'All Roles' },
+              ...USER_ROLES.map((r) => ({ value: r, label: roleLabel(r) })),
+            ]}
+            className="shrink-0 min-w-[150px]"
+          />
+          <span className="text-xs text-gray-400 shrink-0">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}</span>
+        </div>
+
         {/* ─── Mobile: Card list ─── */}
         <div className="md:hidden divide-y divide-gray-100">
-          {users.map((u, i) => (
+          {paginatedUsers.map((u, i) => (
             <motion.div
               key={u.id}
               initial={{ opacity: 0 }}
@@ -216,7 +271,7 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {users.map((u, i) => (
+              {paginatedUsers.map((u, i) => (
                 <motion.tr
                   key={u.id}
                   initial={{ opacity: 0 }}
@@ -270,6 +325,37 @@ export default function UsersPage() {
 
         {isLoading && users.length === 0 && (
           <div className="px-4 py-14 text-center text-sm text-gray-400">Loading users...</div>
+        )}
+        {!isLoading && filteredUsers.length === 0 && (
+          <div className="px-4 py-14 text-center text-sm text-gray-400">No users found.</div>
+        )}
+
+        {/* Pagination */}
+        {totalUserPages > 1 && (
+          <div className="flex items-center justify-between px-4 md:px-6 py-3 border-t border-gray-100">
+            <span className="text-xs text-gray-400">
+              Showing {(usersPage - 1) * USERS_PER_PAGE + 1}–{Math.min(usersPage * USERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                disabled={usersPage === 1}
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4 text-gray-500" />
+              </button>
+              <span className="text-xs font-medium text-gray-600 px-2">
+                {usersPage} / {totalUserPages}
+              </span>
+              <button
+                onClick={() => setUsersPage((p) => Math.min(totalUserPages, p + 1))}
+                disabled={usersPage === totalUserPages}
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

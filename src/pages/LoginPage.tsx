@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -9,7 +10,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
   const { login } = useAuthStore();
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      toast.error('Please enter your email address first.');
+      return;
+    }
+    setIsForgotLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/login`,
+      });
+      if (error) throw error;
+      toast.success('Password reset link sent! Check your inbox.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send reset email.';
+      toast.error(msg);
+    } finally {
+      setIsForgotLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,8 +111,13 @@ export default function LoginPage() {
 
               {/* Forgot password link */}
               <div className="text-right">
-                <button type="button" className="text-[13px] font-medium text-blue-600 hover:text-blue-700 transition-colors">
-                  Forgot Password?
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isForgotLoading}
+                  className="text-[13px] font-medium text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {isForgotLoading ? 'Sending…' : 'Forgot Password?'}
                 </button>
               </div>
 

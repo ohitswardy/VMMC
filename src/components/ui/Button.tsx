@@ -70,6 +70,7 @@ export default function Button({
     <button
       className={buttonVariants({ variant, size, fullWidth, className })}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...(props as Record<string, unknown>)}
     >
       {loading ? (

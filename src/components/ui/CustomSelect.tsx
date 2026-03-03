@@ -32,6 +32,7 @@ export function CustomSelect({
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [flipUp, setFlipUp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +41,12 @@ export function CustomSelect({
   const openDropdown = useCallback(() => {
     const idx = options.findIndex((o) => o.value === value);
     setHighlightedIndex(idx >= 0 ? idx : 0);
+    // Determine flip direction
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setFlipUp(spaceBelow < 260);
+    }
     setIsOpen(true);
   }, [options, value]);
 
@@ -144,7 +151,7 @@ export function CustomSelect({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.12, ease: 'easeOut' }}
-            className="absolute z-50 mt-1 min-w-full w-max bg-white rounded-xl border border-gray-200 shadow-lg shadow-gray-200/60 py-1.5 max-h-[240px] overflow-y-auto right-0"
+            className={`absolute z-50 ${flipUp ? 'bottom-full mb-1' : 'mt-1'} min-w-full w-max bg-white rounded-xl border border-gray-200 shadow-lg shadow-gray-200/60 py-1.5 max-h-[240px] overflow-y-auto right-0`}
             ref={listRef}
           >
             {options.map((option, index) => {
