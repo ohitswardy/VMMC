@@ -111,6 +111,12 @@ export default function DashboardPage() {
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
 
+  // Keep selectedBooking in sync with store data so UI reflects changes (e.g. anesthesiologist assignment)
+  const freshSelectedBooking = useMemo(() => {
+    if (!selectedBooking) return null;
+    return bookings.find(b => b.id === selectedBooking.id) ?? selectedBooking;
+  }, [selectedBooking, bookings]);
+
   const stats = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const todayBookings = bookings.filter((b) => b.date === today);
@@ -601,11 +607,11 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Booking detail modal */}
-      {selectedBooking && (
+      {freshSelectedBooking && (
         <BookingDetailModal
-          isOpen={!!selectedBooking}
+          isOpen={!!freshSelectedBooking}
           onClose={() => setSelectedBooking(null)}
-          booking={selectedBooking}
+          booking={freshSelectedBooking}
           rooms={rooms}
         />
       )}

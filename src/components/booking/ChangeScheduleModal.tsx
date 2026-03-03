@@ -9,7 +9,6 @@ import { TimePicker } from '../ui/TimePicker';
 import { useAuthStore } from '../../stores/authStore';
 import { useChangeRequestsStore } from '../../stores/appStore';
 import { DEPARTMENTS, CHANGE_REASONS, IM_SUBSPECIALTIES, ANES_DEPARTMENT_CONTACT } from '../../lib/constants';
-import { canModifyBooking } from '../../lib/utils';
 import { notifyChangeRequestSubmitted } from '../../lib/notificationHelper';
 import { auditChangeRequestSubmit } from '../../lib/auditHelper';
 import type { Booking } from '../../lib/types';
@@ -25,7 +24,9 @@ export default function ChangeScheduleModal({ isOpen, onClose, booking }: Props)
   const { addRequest } = useChangeRequestsStore();
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
   // Anes admin can override all booking change restrictions
-  const canModify = isAdmin || canModifyBooking(booking);
+  // Department users can always submit change requests for uncompleted bookings
+  // (requests go through admin review, so no 24h/noon cutoff needed)
+  const canModify = isAdmin || !['completed', 'cancelled', 'denied', 'ongoing'].includes(booking.status);
 
   const [form, setForm] = useState({
     department_id: booking.department_id,

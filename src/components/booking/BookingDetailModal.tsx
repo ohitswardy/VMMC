@@ -13,7 +13,7 @@ import { TimePicker } from '../ui/TimePicker';
 import { useAuthStore } from '../../stores/authStore';
 import { useBookingsStore } from '../../stores/appStore';
 import { ANES_DEPARTMENT_CONTACT } from '../../lib/constants';
-import { getDeptColor, getDeptName, formatTime, canModifyBooking } from '../../lib/utils';
+import { getDeptColor, getDeptName, formatTime } from '../../lib/utils';
 import {
   notifyBookingApproved,
   notifyBookingDenied,
@@ -43,9 +43,10 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
   // Anes admin: no restrictions on pending & future bookings
   const canAdminChange = isAdmin && !['completed', 'cancelled', 'denied'].includes(booking.status);
 
-  // Non-admin: uses unified cutoff (24h before OR same-day before noon)
+  // Non-admin: department users can request changes on any uncompleted booking (pending/approved)
+  // Change requests go through admin review, so no 24h/noon cutoff needed
   const canDeptChange = !isAdmin && user?.department_id === booking.department_id &&
-    !['completed', 'cancelled', 'denied', 'ongoing'].includes(booking.status) && canModifyBooking(booking);
+    !['completed', 'cancelled', 'denied', 'ongoing'].includes(booking.status);
 
   // Show noon-blocked message for same-day bookings that can't be modified
   const _now = new Date();
@@ -86,13 +87,19 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
   const handleSaveAnesthesiologist = async () => {
     if (!anesthesiologist.trim()) return;
     setAnesthSaving(true);
-    await updateBooking(booking.id, { anesthesiologist: anesthesiologist.trim() });
+    await updateBooking(booking.id, { anesthesiologist: anesthesiologist.trim(), updated_at: new Date().toISOString() });
     setAnesthSaving(false);
     setAnesthSaved(true);
     setTimeout(() => setAnesthSaved(false), 2000);
   };
 
   const handleApprove = async () => {
+    // Block if no anesthesiologist has been assigned or typed in
+    const effectiveAnes = anesthesiologist.trim() || booking.anesthesiologist?.trim() || '';
+    if (!effectiveAnes) {
+      toast.error('Please assign an anesthesiologist before approving this booking.');
+      return;
+    }
     if (!showApproveConfirm) {
       setShowApproveConfirm(true);
       return;
@@ -248,7 +255,7 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
               <InfoItem icon={<FileText className="w-4 h-4" />} label="Category" value={booking.patient_category} />
               <InfoItem icon={<Building2 className="w-4 h-4" />} label="Ward" value={booking.ward} />
               <InfoItem icon={<Stethoscope className="w-4 h-4" />} label="Surgeon" value={booking.surgeon} />
-              <InfoItem icon={<Stethoscope className="w-4 h-4" />} label="Anesthesiologist" value={booking.anesthesiologist || '—  To be assigned'} />
+              <InfoItem icon={<Stethoscope className="w-4 h-4" />} label="Anesthesiologist" value={anesthesiologist || booking.anesthesiologist || '—  To be assigned'} />
               <InfoItem icon={<Clock className="w-4 h-4" />} label="Est. Duration" value={`${booking.estimated_duration_minutes} min`} />
               {booking.actual_duration_minutes && (
                 <InfoItem icon={<Clock className="w-4 h-4" />} label="Actual Duration" value={`${booking.actual_duration_minutes} min`} />

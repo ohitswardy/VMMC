@@ -18,6 +18,9 @@ export default function DataPrivacyModal({ isOpen, onClose, userId }: DataPrivac
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Track whether this modal instance locked scroll
+  const didLockScrollRef = useRef(false);
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleClose();
@@ -25,10 +28,14 @@ export default function DataPrivacyModal({ isOpen, onClose, userId }: DataPrivac
     if (isOpen) {
       document.addEventListener('keydown', handleEsc);
       document.body.style.overflow = 'hidden';
+      didLockScrollRef.current = true;
     }
     return () => {
       document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'unset';
+      if (didLockScrollRef.current) {
+        document.body.style.overflow = 'unset';
+        didLockScrollRef.current = false;
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);

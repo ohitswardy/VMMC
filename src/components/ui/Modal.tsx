@@ -63,12 +63,16 @@ export default function Modal({ isOpen, onClose, title, titleExtra, children, si
     }
   }, []); // stable — no deps
 
+  // Track whether this modal instance locked scroll
+  const didLockScrollRef = useRef(false);
+
   useEffect(() => {
     if (isOpen) {
       wasOpenRef.current = true;
       previousActiveRef.current = document.activeElement as HTMLElement;
       document.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
+      didLockScrollRef.current = true;
 
       // Auto-focus the first input once when modal opens
       if (!didAutoFocusRef.current) {
@@ -84,7 +88,10 @@ export default function Modal({ isOpen, onClose, title, titleExtra, children, si
       }
     } else {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'unset';
+      if (didLockScrollRef.current) {
+        document.body.style.overflow = 'unset';
+        didLockScrollRef.current = false;
+      }
       didAutoFocusRef.current = false;
 
       // Only restore focus when the modal actually closes (not on mount)
@@ -95,6 +102,15 @@ export default function Modal({ isOpen, onClose, title, titleExtra, children, si
         }
       }
     }
+
+    // Cleanup on unmount: always release scroll lock if this instance holds it
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (didLockScrollRef.current) {
+        document.body.style.overflow = 'unset';
+        didLockScrollRef.current = false;
+      }
+    };
   }, [isOpen, handleKeyDown]);
 
   return (

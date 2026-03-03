@@ -298,6 +298,7 @@ export default function BookingsPage() {
   const [selectedChangeRequest, setSelectedChangeRequest] = useState<BookingChangeRequest | null>(null);
   const [crModalDenying, setCrModalDenying] = useState(false);
   const [crModalDenyReason, setCrModalDenyReason] = useState('');
+  const [crModalAnesInput, setCrModalAnesInput] = useState('');
   const [showMyBookingsPanel, setShowMyBookingsPanel] = useState(false);
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'anesthesiology_admin';
@@ -308,6 +309,24 @@ export default function BookingsPage() {
   useEffect(() => {
     if (isAdmin) loadRequests();
   }, [isAdmin, loadRequests]);
+
+  // Initialize anesthesiologist input when a change request is selected
+  useEffect(() => {
+    if (selectedChangeRequest) {
+      const bk = bookings.find(b => b.id === selectedChangeRequest.original_booking_id);
+      setCrModalAnesInput(
+        selectedChangeRequest.preferred_anesthesiologist ||
+        bk?.anesthesiologist ||
+        ''
+      );
+    }
+  }, [selectedChangeRequest, bookings]);
+
+  // Keep selectedBooking in sync with store data so UI reflects changes
+  const freshSelectedBooking = useMemo(() => {
+    if (!selectedBooking) return null;
+    return bookings.find(b => b.id === selectedBooking.id) ?? selectedBooking;
+  }, [selectedBooking, bookings]);
 
   const pendingRequests = useMemo(
     () => requests.filter((r) => r.status === 'pending'),
@@ -328,6 +347,11 @@ export default function BookingsPage() {
   }, [bookings, isAdmin, user]);
 
   const handlePanelApprove = async (id: string) => {
+    const booking = bookings.find((b) => b.id === id);
+    if (!booking?.anesthesiologist?.trim()) {
+      toast.error('Please assign an anesthesiologist before approving this booking.');
+      return;
+    }
     setPanelApprovingId(id);
     try {
       await updateBooking(id, { status: 'approved' });
@@ -351,11 +375,18 @@ export default function BookingsPage() {
     finally { setPanelDenyingId(null); }
   };
 
-  const handleApproveRequest = async (requestId: string) => {
+  const handleApproveRequest = async (requestId: string, assignedAnesthesiologist?: string) => {
     const req = requests.find((r) => r.id === requestId);
     if (!req) return;
     const booking = bookings.find((b) => b.id === req.original_booking_id);
     if (!booking) { toast.error('Original booking not found.'); return; }
+
+    // Use the provided anesthesiologist, or fall back to the request/booking values
+    const effectiveAnes = assignedAnesthesiologist?.trim() || req.preferred_anesthesiologist || booking.anesthesiologist?.trim() || '';
+    if (!effectiveAnes) {
+      toast.error('Please assign an anesthesiologist before approving the change request.');
+      return;
+    }
 
     setCrActionLoading(requestId);
     try {
@@ -382,6 +413,7 @@ export default function BookingsPage() {
         start_time: req.new_preferred_time,
         end_time: newEndTime,
         department_id: req.department_id,
+        anesthesiologist: effectiveAnes,
         status: booking.status === 'pending' ? 'approved' : booking.status,
       };
 
@@ -390,10 +422,7 @@ export default function BookingsPage() {
         bookingUpdates.procedure = req.procedure;
       }
 
-      // Apply anesthesiologist change
-      if (req.preferred_anesthesiologist) {
-        bookingUpdates.anesthesiologist = req.preferred_anesthesiologist;
-      }
+      // Apply anesthesiologist change from the request (effectiveAnes already set above)
 
       // Parse patient_details back into individual fields.
       // Format: "Name Age/Sex/Category Ward WardName"
@@ -675,6 +704,33 @@ export default function BookingsPage() {
                   </div>
                 </div>
 
+                {/* ── Assign Anesthesiologist (admin) ── */}
+                {isAdmin && selectedChangeRequest.status === 'pending' && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Assign Anesthesiologist</p>
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-600 mb-1.5">Anesthesiologist Name</label>
+                          <input
+                            type="text"
+                            value={crModalAnesInput}
+                            onChange={(e) => setCrModalAnesInput(e.target.value)}
+                            placeholder="e.g. Dr. Juan Dela Cruz"
+                            className="w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-accent-300 transition-colors"
+                          />
+                        </div>
+                      </div>
+                      {!crModalAnesInput.trim() && (
+                        <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          An anesthesiologist must be assigned before approving
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* ── Reason ── */}
                 <div>
                   <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Reason for Change</p>
@@ -758,7 +814,7 @@ export default function BookingsPage() {
                     </button>
                     <button
                       onClick={async () => {
-                        await handleApproveRequest(selectedChangeRequest.id);
+                        await handleApproveRequest(selectedChangeRequest.id, crModalAnesInput);
                         setSelectedChangeRequest(null);
                       }}
                       disabled={crActionLoading === selectedChangeRequest.id}
@@ -1370,11 +1426,11 @@ export default function BookingsPage() {
       )}
 
       {/* Detail modal */}
-      {selectedBooking && (
+      {freshSelectedBooking && (
         <BookingDetailModal
-          isOpen={!!selectedBooking}
+          isOpen={!!freshSelectedBooking}
           onClose={() => setSelectedBooking(null)}
-          booking={selectedBooking}
+          booking={freshSelectedBooking}
           rooms={rooms}
         />
       )}

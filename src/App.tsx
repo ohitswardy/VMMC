@@ -27,7 +27,6 @@ import { supabase } from './lib/supabase';
 import { sendUpcomingReminders, sendPurgeWarnings } from './lib/notificationHelper';
 import type { Notification } from './lib/types';
 import DataPrivacyModal from './components/ui/DataPrivacyModal';
-import { hasAcknowledgedCurrentPolicy, hasAcknowledgedPolicyServer } from './lib/privacyPolicy';
 import useIdleTimeout from './lib/useIdleTimeout';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
@@ -110,21 +109,14 @@ export default function App() {
     initAuth();
   }, [initAuth]);
 
-  // Show Data Privacy Modal once per login.
-  // Logout clears the localStorage ack (authStore), so the next login always shows it.
-  // Page refresh keeps the ack → modal stays hidden.
-  // Bumping PRIVACY_POLICY_VERSION also re-triggers it for all users.
-  // Checks both localStorage (fast) and server (cross-device reliability).
+  // Show Data Privacy Modal on every login for non-super-admin users.
+  // Logout clears the flag; page refresh keeps it hidden until next login cycle.
+  // acknowledgePolicy() still records it for compliance/audit purposes.
   useEffect(() => {
     if (isAuthenticated && user && !authLoading) {
-      if (!hasAcknowledgedCurrentPolicy(user.id)) {
-        // localStorage says not acknowledged — double-check server in case another device acknowledged
-        hasAcknowledgedPolicyServer(user.id).then((serverAcked) => {
-          if (!serverAcked) {
-            setShowPrivacyModal(true);
-          }
-        });
-      }
+      // Super admins are exempt from the privacy modal
+      if (user.role === 'super_admin') return;
+      setShowPrivacyModal(true);
     }
   }, [isAuthenticated, user, authLoading]);
 
