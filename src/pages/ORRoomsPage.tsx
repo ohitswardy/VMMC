@@ -5,7 +5,6 @@ import { Plus, Edit2, Clock, CalendarClock, UserCheck, Save, X, Trash2, GripVert
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -15,7 +14,6 @@ import {
 import {
   arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
@@ -75,6 +73,7 @@ function SortableRoomCard({ room, index, isDragEnabled, children }: SortableRoom
         <div
           {...attributes}
           {...listeners}
+          tabIndex={-1}
           className="flex items-center justify-center gap-1 py-1.5 cursor-grab active:cursor-grabbing bg-gray-50 border-b border-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           title="Drag to reorder"
         >
@@ -184,7 +183,6 @@ export default function ORRoomsPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -247,7 +245,12 @@ export default function ORRoomsPage() {
       </div>
 
       {/* Rooms Grid – drag-and-drop enabled for admins */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+        accessibility={{ screenReaderInstructions: { draggable: '' } }}
+      >
         <SortableContext items={rooms.map((r) => r.id)} strategy={rectSortingStrategy}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {rooms.map((room, i) => {

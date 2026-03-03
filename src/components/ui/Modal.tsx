@@ -25,63 +25,76 @@ export default function Modal({ isOpen, onClose, title, titleExtra, children, si
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const previousActiveRef = useRef<HTMLElement | null>(null);
+  const didAutoFocusRef = useRef(false);
+  const wasOpenRef = useRef(false);
   const titleId = useRef(`modal-title-${Math.random().toString(36).slice(2, 9)}`).current;
 
-  // Focus trap
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-        return;
+  // Keep onClose in a ref so handleKeyDown never needs to change identity
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
+  // Stable focus-trap handler — never recreated, so the effect below
+  // only runs when `isOpen` actually changes.
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onCloseRef.current();
+      return;
+    }
+    if (e.key !== 'Tab' || !panelRef.current) return;
+
+    const focusable = Array.from(
+      panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+    );
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
       }
-      if (e.key !== 'Tab' || !panelRef.current) return;
-
-      const focusable = Array.from(
-        panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-      );
-      if (focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
-    },
-    [onClose]
-  );
+    }
+  }, []); // stable — no deps
 
   useEffect(() => {
     if (isOpen) {
+      wasOpenRef.current = true;
       previousActiveRef.current = document.activeElement as HTMLElement;
       document.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
 
-      // Auto-focus the first focusable element inside the panel
-      requestAnimationFrame(() => {
-        if (panelRef.current) {
-          const first = panelRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-          first?.focus();
-        }
-      });
-    }
-    return () => {
+      // Auto-focus the first input once when modal opens
+      if (!didAutoFocusRef.current) {
+        didAutoFocusRef.current = true;
+        requestAnimationFrame(() => {
+          if (panelRef.current) {
+            const firstInput = panelRef.current.querySelector<HTMLElement>(
+              'input:not([disabled]), textarea:not([disabled]), select:not([disabled])'
+            );
+            firstInput?.focus();
+          }
+        });
+      }
+    } else {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
+      didAutoFocusRef.current = false;
 
-      // Restore focus to the element that triggered the modal
-      if (previousActiveRef.current && typeof previousActiveRef.current.focus === 'function') {
-        previousActiveRef.current.focus();
+      // Only restore focus when the modal actually closes (not on mount)
+      if (wasOpenRef.current) {
+        wasOpenRef.current = false;
+        if (previousActiveRef.current && typeof previousActiveRef.current.focus === 'function') {
+          previousActiveRef.current.focus();
+        }
       }
-    };
+    }
   }, [isOpen, handleKeyDown]);
 
   return (
