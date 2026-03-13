@@ -377,7 +377,7 @@ export default function BookingDetailModal({ isOpen, onClose, booking, rooms = [
                   </Button>
                 </>
               )}
-              {canChange && !denyMode && (
+              {canChange && !denyMode && !(isAdmin && booking.status === 'pending') && (
                 <Button variant="secondary" size="sm" type="button" icon={<Edit className="w-3.5 h-3.5" />} onClick={handleRequestChange}>
                   Request Change
                 </Button>

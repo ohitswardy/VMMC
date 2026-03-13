@@ -276,6 +276,18 @@ export async function generateSchedulePDF(
     }
   }
 
+  // ── System-generated footer (all pages) ──
+  const generatedAt = format(new Date(), 'MMMM d, yyyy h:mm a');
+  const footerText = `This document is system generated • ${generatedAt}`;
+  const pageCount = doc.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text(footerText, pageWidth / 2, pageHeight - 8, { align: 'center' });
+  }
+
   // ── Save ──
   const fileName = `OR_Schedule_${dateStr}.pdf`;
   doc.save(fileName);

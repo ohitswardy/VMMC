@@ -253,6 +253,10 @@ function BookingCard({
             <span className="text-gray-400">Surgeon</span>
             <span className="ml-1.5 text-gray-600">{b.surgeon}</span>
           </div>
+          <div className="col-span-2">
+            <span className="text-gray-400">Anesthesiology</span>
+            <span className="ml-1.5 text-gray-600">{b.anesthesiologist || 'To be assigned'}</span>
+          </div>
         </div>
 
         {b.is_emergency && (
@@ -909,6 +913,7 @@ export default function BookingsPage() {
                               <StatusBadge status={b.status} size="sm" />
                             </div>
                             <p className="text-[13px] text-gray-600">{b.patient_name} · {b.patient_age}/{b.patient_sex}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Anesthesiology: {b.anesthesiologist || 'To be assigned'}</p>
                             <p className="text-xs text-gray-400 mt-0.5">
                               {room?.name || 'No room assigned'} · Ward {b.ward || '—'}
                             </p>
@@ -1012,6 +1017,7 @@ export default function BookingsPage() {
                               )}
                             </div>
                             <p className="text-[13px] text-gray-600">{b.patient_name} · {b.patient_age}/{b.patient_sex}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Anesthesiology: {b.anesthesiologist || 'To be assigned'}</p>
                             <p className="text-xs text-gray-400 mt-0.5">
                               {getDeptName(b.department_id)} · {room?.name || 'No room'}
                             </p>
