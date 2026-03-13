@@ -1,5 +1,12 @@
 import { getStatusColor } from '../../lib/utils';
 
+/**
+ * Neo-Skeuomorphism Status Badge
+ * - Embossed pill with layered shadows
+ * - Subtle inner light rim
+ * - Pulsing dot for ongoing status
+ */
+
 interface StatusBadgeProps {
   status: string;
   size?: 'sm' | 'md';
@@ -18,8 +25,9 @@ export default function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
       role="status"
       aria-label={`Status: ${label}`}
       className={`
-        inline-flex items-center gap-1.5 rounded-[6px] font-semibold whitespace-nowrap
+        inline-flex items-center gap-1.5 rounded-[8px] font-bold whitespace-nowrap
         ${colors.bg} ${colors.text} border ${colors.border || 'border-transparent'}
+        shadow-[0_1px_2px_oklch(0.15_0.01_75/0.08),inset_0_1px_0_oklch(1_0_0/0.20)]
         ${size === 'sm' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-0.5 text-[11px]'}
       `}
     >

@@ -18,6 +18,14 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
+/**
+ * Neo-Skeuomorphism DatePicker
+ * - Calendar grid: day cells feel like physical keys
+ * - Raised default, pressed active, selected glow
+ * - Frosted glass calendar panel
+ * - Month nav buttons: tactile raised surface
+ */
+
 interface DatePickerProps {
   label?: string;
   value: string; // yyyy-MM-dd
@@ -179,19 +187,22 @@ export function DatePicker({
   return (
     <div className="relative space-y-1.5" ref={containerRef}>
       {label && (
-        <label className="block text-[13px] font-medium text-gray-700">
+        <label className="block text-[13px] font-semibold text-gray-600">
           {label}
           {required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       )}
 
-      {/* Trigger */}
+      {/* Trigger — embossed well */}
       <button
         type="button"
         onClick={() => setIsOpen((o) => !o)}
         className={`
           input-base text-left flex items-center justify-between gap-2 cursor-pointer
-          ${error ? '!border-red-300 focus:!ring-red-100 focus:!border-red-400' : ''}
+          ${error
+            ? '!border-red-300 !shadow-[inset_0_2px_4px_oklch(0.4_0.15_25/0.10),0_0_0_3px_oklch(0.58_0.22_25/0.12)]'
+            : ''
+          }
           ${!value ? 'text-gray-400' : ''}
         `}
       >
@@ -199,34 +210,47 @@ export function DatePicker({
         <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
       </button>
 
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && <p className="text-xs font-medium text-red-500 mt-1">{error}</p>}
 
-      {/* Dropdown Calendar */}
+      {/* Frosted Glass Calendar Panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: -8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="absolute z-50 mt-1 bg-white rounded-xl border border-gray-200 shadow-lg shadow-gray-200/60 p-4 w-[304px]"
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+            className="absolute z-50 mt-1 p-4 w-[304px] rounded-xl
+              bg-white/88 backdrop-blur-xl backdrop-saturate-150
+              border border-white/50
+              shadow-[0_12px_40px_oklch(0.15_0.01_75/0.18),0_4px_12px_oklch(0.15_0.01_75/0.10),inset_0_1px_0_oklch(1_0_0/0.40)]"
           >
             {/* Month navigation */}
             <div className="flex items-center justify-between mb-3">
               <button
                 type="button"
                 onClick={goToPrevMonth}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg
+                  bg-white border border-gray-200 text-gray-500
+                  shadow-[0_1px_3px_oklch(0.15_0.01_75/0.10),inset_0_1px_0_oklch(1_0_0/0.50)]
+                  hover:shadow-[0_2px_6px_oklch(0.15_0.01_75/0.14),inset_0_1px_0_oklch(1_0_0/0.60)]
+                  active:shadow-[inset_0_1px_3px_oklch(0.15_0.01_75/0.15)] active:scale-[0.95]
+                  transition-all duration-[120ms]"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-sm font-semibold text-gray-900">
+              <span className="text-sm font-bold text-gray-900">
                 {format(currentMonth, 'MMMM yyyy')}
               </span>
               <button
                 type="button"
                 onClick={goToNextMonth}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg
+                  bg-white border border-gray-200 text-gray-500
+                  shadow-[0_1px_3px_oklch(0.15_0.01_75/0.10),inset_0_1px_0_oklch(1_0_0/0.50)]
+                  hover:shadow-[0_2px_6px_oklch(0.15_0.01_75/0.14),inset_0_1px_0_oklch(1_0_0/0.60)]
+                  active:shadow-[inset_0_1px_3px_oklch(0.15_0.01_75/0.15)] active:scale-[0.95]
+                  transition-all duration-[120ms]"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -237,14 +261,14 @@ export function DatePicker({
               {weekDays.map((d) => (
                 <div
                   key={d}
-                  className="h-9 flex items-center justify-center text-xs font-medium text-gray-400"
+                  className="h-9 flex items-center justify-center text-xs font-bold text-gray-400"
                 >
                   {d}
                 </div>
               ))}
             </div>
 
-            {/* Days grid — animated */}
+            {/* Days grid — animated, physical key cells */}
             <AnimatePresence initial={false} custom={direction} mode="wait">
               <motion.div
                 key={format(currentMonth, 'yyyy-MM')}
@@ -254,7 +278,7 @@ export function DatePicker({
                 animate="center"
                 exit="exit"
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
-                className="grid grid-cols-7"
+                className="grid grid-cols-7 gap-0.5"
                 role="grid"
                 aria-label="Calendar"
                 tabIndex={0}
@@ -278,11 +302,18 @@ export function DatePicker({
                       aria-selected={!!selected}
                       aria-label={format(day, 'EEEE, MMMM d, yyyy')}
                       className={`
-                        h-9 w-full flex items-center justify-center text-[13px] rounded-lg transition-all duration-100
+                        h-9 w-full flex items-center justify-center text-[13px] rounded-lg
+                        transition-all duration-[120ms]
                         ${!inMonth ? 'text-gray-300' : 'text-gray-700'}
-                        ${selected ? 'bg-accent-600 !text-white font-semibold shadow-sm' : ''}
-                        ${!selected && today ? 'font-semibold text-accent-600' : ''}
-                        ${!selected && inMonth && !isPast ? 'hover:bg-accent-50 hover:text-accent-700' : ''}
+                        ${selected
+                          ? 'bg-accent-600 !text-white font-bold shadow-[0_2px_6px_oklch(0.35_0.20_270/0.35),inset_0_1px_0_oklch(1_0_0/0.15)]'
+                          : ''
+                        }
+                        ${!selected && today ? 'font-bold text-accent-600' : ''}
+                        ${!selected && inMonth && !isPast
+                          ? 'hover:bg-white hover:shadow-[0_1px_3px_oklch(0.15_0.01_75/0.12),inset_0_1px_0_oklch(1_0_0/0.50)] active:shadow-[inset_0_1px_3px_oklch(0.15_0.01_75/0.15)] active:scale-[0.93]'
+                          : ''
+                        }
                         ${isPast ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
                         ${isFocused && !selected ? 'ring-2 ring-accent-400 ring-inset' : ''}
                       `}
@@ -295,21 +326,27 @@ export function DatePicker({
             </AnimatePresence>
 
             {/* Footer */}
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200/60">
               <button
                 type="button"
                 onClick={() => {
                   onChange('');
                   setIsOpen(false);
                 }}
-                className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors px-2 py-1 rounded-md hover:bg-gray-50"
+                className="text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors px-3 py-1.5 rounded-lg
+                  hover:bg-gray-100 hover:shadow-[0_1px_2px_oklch(0.15_0.01_75/0.08),inset_0_1px_0_oklch(1_0_0/0.40)]
+                  active:shadow-[inset_0_1px_2px_oklch(0.15_0.01_75/0.12)] active:scale-[0.97]
+                  transition-all duration-[120ms]"
               >
                 Clear
               </button>
               <button
                 type="button"
                 onClick={goToToday}
-                className="text-xs font-medium text-accent-600 hover:text-accent-700 transition-colors px-2 py-1 rounded-md hover:bg-accent-50"
+                className="text-xs font-semibold text-accent-600 hover:text-accent-700 transition-colors px-3 py-1.5 rounded-lg
+                  hover:bg-accent-50 hover:shadow-[0_1px_2px_oklch(0.3_0.15_270/0.10),inset_0_1px_0_oklch(1_0_0/0.40)]
+                  active:shadow-[inset_0_1px_2px_oklch(0.3_0.15_270/0.12)] active:scale-[0.97]
+                  transition-all duration-[120ms]"
               >
                 Today
               </button>

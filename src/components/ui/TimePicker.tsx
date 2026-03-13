@@ -2,6 +2,15 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Clock, ChevronUp, ChevronDown } from 'lucide-react';
 
+/**
+ * Neo-Skeuomorphism TimePicker
+ * - Spinner buttons: raised tactile surfaces
+ * - Time display: embossed wells
+ * - AM/PM toggle: physical toggle feel
+ * - Quick picks: raised physical keys
+ * - Frosted glass panel
+ */
+
 interface TimePickerProps {
   label?: string;
   value: string; // HH:mm (24h)
@@ -35,6 +44,16 @@ function formatDisplay(value: string) {
   const { h12, period } = to12Hour(h24);
   return `${pad(h12)}:${pad(m)} ${period}`;
 }
+
+/* Reusable spinner arrow button style */
+const spinnerBtnClass = `
+  w-10 h-7 flex items-center justify-center rounded-lg
+  bg-white border border-gray-200 text-gray-400
+  shadow-[0_1px_2px_oklch(0.15_0.01_75/0.08),inset_0_1px_0_oklch(1_0_0/0.40)]
+  hover:text-gray-600 hover:shadow-[0_2px_4px_oklch(0.15_0.01_75/0.12),inset_0_1px_0_oklch(1_0_0/0.50)]
+  active:shadow-[inset_0_1px_3px_oklch(0.15_0.01_75/0.15)] active:scale-[0.95]
+  transition-all duration-[120ms]
+`;
 
 export function TimePicker({
   label,
@@ -116,19 +135,22 @@ export function TimePicker({
   return (
     <div className="relative space-y-1.5" ref={containerRef}>
       {label && (
-        <label className="block text-[13px] font-medium text-gray-700">
+        <label className="block text-[13px] font-semibold text-gray-600">
           {label}
           {required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       )}
 
-      {/* Trigger */}
+      {/* Trigger — embossed well */}
       <button
         type="button"
         onClick={() => setIsOpen((o) => !o)}
         className={`
           input-base text-left flex items-center justify-between gap-2 cursor-pointer w-full
-          ${error ? '!border-red-300 focus:!ring-red-100 focus:!border-red-400' : ''}
+          ${error
+            ? '!border-red-300 !shadow-[inset_0_2px_4px_oklch(0.4_0.15_25/0.10),0_0_0_3px_oklch(0.58_0.22_25/0.12)]'
+            : ''
+          }
           ${!value ? 'text-gray-400' : ''}
         `}
       >
@@ -136,17 +158,20 @@ export function TimePicker({
         <Clock className="w-4 h-4 text-gray-400 shrink-0" />
       </button>
 
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && <p className="text-xs font-medium text-red-500 mt-1">{error}</p>}
 
-      {/* Dropdown */}
+      {/* Frosted Glass Dropdown */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: -8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="absolute z-50 mt-1 bg-white rounded-xl border border-gray-200 shadow-lg shadow-gray-200/60 p-4 w-[220px]"
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+            className="absolute z-50 mt-1 p-4 w-[220px] rounded-xl
+              bg-white/88 backdrop-blur-xl backdrop-saturate-150
+              border border-white/50
+              shadow-[0_12px_40px_oklch(0.15_0.01_75/0.18),0_4px_12px_oklch(0.15_0.01_75/0.10),inset_0_1px_0_oklch(1_0_0/0.40)]"
           >
             {/* Spinners */}
             <div className="flex items-center justify-center gap-2">
@@ -156,18 +181,21 @@ export function TimePicker({
                   type="button"
                   onClick={incHour}
                   aria-label="Increase hour"
-                  className="w-10 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                  className={spinnerBtnClass}
                 >
                   <ChevronUp className="w-4 h-4" />
                 </button>
-                <div className="w-14 h-12 flex items-center justify-center rounded-lg bg-accent-50 text-accent-700 text-xl font-bold tabular-nums">
+                <div className="w-14 h-12 flex items-center justify-center rounded-lg text-xl font-bold tabular-nums
+                  bg-white border border-gray-200 text-accent-700
+                  shadow-[inset_0_2px_4px_oklch(0.15_0.01_75/0.10),inset_0_1px_2px_oklch(0.15_0.01_75/0.06),0_1px_0_oklch(1_0_0/0.60)]
+                  my-1">
                   {pad(hour)}
                 </div>
                 <button
                   type="button"
                   onClick={decHour}
                   aria-label="Decrease hour"
-                  className="w-10 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                  className={spinnerBtnClass}
                 >
                   <ChevronDown className="w-4 h-4" />
                 </button>
@@ -182,42 +210,52 @@ export function TimePicker({
                   type="button"
                   onClick={incMinute}
                   aria-label="Increase minute"
-                  className="w-10 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                  className={spinnerBtnClass}
                 >
                   <ChevronUp className="w-4 h-4" />
                 </button>
-                <div className="w-14 h-12 flex items-center justify-center rounded-lg bg-accent-50 text-accent-700 text-xl font-bold tabular-nums">
+                <div className="w-14 h-12 flex items-center justify-center rounded-lg text-xl font-bold tabular-nums
+                  bg-white border border-gray-200 text-accent-700
+                  shadow-[inset_0_2px_4px_oklch(0.15_0.01_75/0.10),inset_0_1px_2px_oklch(0.15_0.01_75/0.06),0_1px_0_oklch(1_0_0/0.60)]
+                  my-1">
                   {pad(minute)}
                 </div>
                 <button
                   type="button"
                   onClick={decMinute}
                   aria-label="Decrease minute"
-                  className="w-10 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                  className={spinnerBtnClass}
                 >
                   <ChevronDown className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* AM/PM toggle */}
-              <div className="flex flex-col items-center ml-1">
+              {/* AM/PM toggle — physical toggle buttons */}
+              <div className="flex flex-col items-center ml-1 gap-1.5">
                 <button
                   type="button"
                   onClick={togglePeriod}
                   className={`
-                    w-12 h-9 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors
-                    ${period === 'AM' ? 'bg-accent-600 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}
+                    w-12 h-9 flex items-center justify-center rounded-lg text-xs font-bold
+                    transition-all duration-[120ms] active:scale-[0.95]
+                    ${period === 'AM'
+                      ? 'bg-accent-600 text-white border border-accent-700 shadow-[0_2px_4px_oklch(0.3_0.15_270/0.25),inset_0_1px_0_oklch(1_0_0/0.12)]'
+                      : 'bg-white text-gray-500 border border-gray-200 shadow-[0_1px_2px_oklch(0.15_0.01_75/0.08),inset_0_1px_0_oklch(1_0_0/0.40)] hover:bg-gray-50'
+                    }
                   `}
                 >
                   AM
                 </button>
-                <div className="h-1.5" />
                 <button
                   type="button"
                   onClick={togglePeriod}
                   className={`
-                    w-12 h-9 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors
-                    ${period === 'PM' ? 'bg-accent-600 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}
+                    w-12 h-9 flex items-center justify-center rounded-lg text-xs font-bold
+                    transition-all duration-[120ms] active:scale-[0.95]
+                    ${period === 'PM'
+                      ? 'bg-accent-600 text-white border border-accent-700 shadow-[0_2px_4px_oklch(0.3_0.15_270/0.25),inset_0_1px_0_oklch(1_0_0/0.12)]'
+                      : 'bg-white text-gray-500 border border-gray-200 shadow-[0_1px_2px_oklch(0.15_0.01_75/0.08),inset_0_1px_0_oklch(1_0_0/0.40)] hover:bg-gray-50'
+                    }
                   `}
                 >
                   PM
@@ -225,8 +263,8 @@ export function TimePicker({
               </div>
             </div>
 
-            {/* Quick picks */}
-            <div className="mt-3 pt-3 border-t border-gray-100">
+            {/* Quick picks — physical key grid */}
+            <div className="mt-3 pt-3 border-t border-gray-200/60">
               <div className="grid grid-cols-4 gap-1.5">
                 {['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'].map((t) => {
                   const isSelected = value === t;
@@ -240,8 +278,11 @@ export function TimePicker({
                         setIsOpen(false);
                       }}
                       className={`
-                        px-1 py-1.5 text-[10px] font-medium rounded-lg transition-colors
-                        ${isSelected ? 'bg-accent-600 text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}
+                        px-1 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-[120ms] active:scale-[0.93]
+                        ${isSelected
+                          ? 'bg-accent-600 text-white border border-accent-700 shadow-[0_1px_3px_oklch(0.3_0.15_270/0.25),inset_0_1px_0_oklch(1_0_0/0.12)]'
+                          : 'text-gray-500 bg-white border border-gray-200 shadow-[0_1px_2px_oklch(0.15_0.01_75/0.06),inset_0_1px_0_oklch(1_0_0/0.30)] hover:shadow-[0_2px_4px_oklch(0.15_0.01_75/0.10),inset_0_1px_0_oklch(1_0_0/0.50)] hover:text-gray-700'
+                        }
                       `}
                     >
                       {display}
@@ -251,11 +292,15 @@ export function TimePicker({
               </div>
             </div>
 
-            {/* Done button */}
+            {/* Done button — raised */}
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="mt-3 w-full py-2 text-xs font-semibold text-accent-600 hover:text-accent-700 hover:bg-accent-50 rounded-lg transition-colors"
+              className="mt-3 w-full py-2 text-xs font-bold rounded-lg transition-all duration-[120ms]
+                text-accent-600 bg-accent-50 border border-accent-100
+                shadow-[0_1px_3px_oklch(0.3_0.15_270/0.08),inset_0_1px_0_oklch(1_0_0/0.40)]
+                hover:bg-accent-100 hover:shadow-[0_2px_6px_oklch(0.3_0.15_270/0.12),inset_0_1px_0_oklch(1_0_0/0.50)]
+                active:shadow-[inset_0_1px_3px_oklch(0.3_0.15_270/0.15)] active:scale-[0.98]"
             >
               Done
             </button>

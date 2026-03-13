@@ -1,57 +1,95 @@
 @import "tailwindcss";
+@import "./styles/animation-tokens.css";
 
 /* ═══════════════════════════════════════════════
-   VMMC OR Booking System — Design System
-   Inspired by: Linear, Vercel, Stripe
-   Principle: Clean, intentional, human-crafted
+   VMMC OR Booking System — Neo-Skeuomorphism Design System
+   2026 Edition: Soft physical depth, layered tactile surfaces,
+   ambient light simulation, premium material feel.
+   oklch colors · layered shadows · micro-animations
    ═══════════════════════════════════════════════ */
 
 @theme {
-  /* ── Accent — Indigo (single strong accent) ── */
-  --color-accent-50: #eef2ff;
-  --color-accent-100: #e0e7ff;
-  --color-accent-200: #c7d2fe;
-  --color-accent-300: #a5b4fc;
-  --color-accent-400: #818cf8;
-  --color-accent-500: #6366f1;
-  --color-accent-600: #4f46e5;
-  --color-accent-700: #4338ca;
-  --color-accent-800: #3730a3;
-  --color-accent-900: #312e81;
+  /* ── Accent — Deep Indigo in oklch ── */
+  --color-accent-50:  oklch(0.97 0.02 270);
+  --color-accent-100: oklch(0.93 0.04 270);
+  --color-accent-200: oklch(0.86 0.08 270);
+  --color-accent-300: oklch(0.76 0.12 270);
+  --color-accent-400: oklch(0.66 0.18 270);
+  --color-accent-500: oklch(0.55 0.24 270);
+  --color-accent-600: oklch(0.48 0.26 270);
+  --color-accent-700: oklch(0.42 0.24 270);
+  --color-accent-800: oklch(0.36 0.20 270);
+  --color-accent-900: oklch(0.28 0.14 270);
 
-  /* ── Neutral — True zinc grays ── */
-  --color-gray-50: #fafafa;
-  --color-gray-100: #f4f4f5;
-  --color-gray-150: #ebebec;
-  --color-gray-200: #e4e4e7;
-  --color-gray-300: #d4d4d8;
-  --color-gray-400: #a1a1aa;
-  --color-gray-500: #71717a;
-  --color-gray-600: #52525b;
-  --color-gray-700: #3f3f46;
-  --color-gray-800: #27272a;
-  --color-gray-900: #18181b;
-  --color-gray-950: #09090b;
+  /* ── Neutral — Warm stone grays in oklch ── */
+  --color-gray-50:  oklch(0.985 0.003 80);
+  --color-gray-100: oklch(0.965 0.004 80);
+  --color-gray-150: oklch(0.943 0.004 80);
+  --color-gray-200: oklch(0.915 0.005 80);
+  --color-gray-300: oklch(0.858 0.006 80);
+  --color-gray-400: oklch(0.706 0.008 80);
+  --color-gray-500: oklch(0.560 0.010 80);
+  --color-gray-600: oklch(0.440 0.012 75);
+  --color-gray-700: oklch(0.370 0.012 75);
+  --color-gray-800: oklch(0.280 0.010 75);
+  --color-gray-900: oklch(0.190 0.008 75);
+  --color-gray-950: oklch(0.130 0.006 75);
 
-  /* ── Surfaces ── */
-  --color-surface: #ffffff;
-  --color-surface-raised: #fafafa;
-  --color-surface-overlay: rgba(9, 9, 11, 0.5);
+  /* ── Surfaces — warm tinted ── */
+  --color-surface:        oklch(0.995 0.003 80);
+  --color-surface-raised: oklch(0.985 0.004 80);
+  --color-surface-overlay: oklch(0.15 0.01 75 / 0.55);
 
   /* ── Semantic ── */
-  --color-success: #22c55e;
-  --color-warning: #eab308;
-  --color-danger: #ef4444;
+  --color-success: oklch(0.62 0.20 145);
+  --color-warning: oklch(0.78 0.18 85);
+  --color-danger:  oklch(0.58 0.22 25);
 
-  /* ── Typography ── */
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* ── Typography — Humanist sans ── */
+  --font-sans: 'DM Sans', 'Nunito Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  /* ── Shadows — subtle, layered ── */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05);
+  /* ── Neo-Skeuomorphic Shadow Scale ──
+     Each level: dark outer drop + bright inner highlight rim */
+  --shadow-xs:
+    0 1px 2px oklch(0.15 0.01 75 / 0.12),
+    inset 0 1px 0 oklch(1 0 0 / 0.08);
+  --shadow-sm:
+    0 1px 3px oklch(0.15 0.01 75 / 0.15),
+    0 1px 2px oklch(0.15 0.01 75 / 0.08),
+    inset 0 1px 0 oklch(1 0 0 / 0.10);
+  --shadow-md:
+    0 4px 12px oklch(0.15 0.01 75 / 0.12),
+    0 2px 4px oklch(0.15 0.01 75 / 0.08),
+    inset 0 1px 0 oklch(1 0 0 / 0.12);
+  --shadow-lg:
+    0 8px 24px oklch(0.15 0.01 75 / 0.14),
+    0 4px 8px oklch(0.15 0.01 75 / 0.08),
+    inset 0 1px 0 oklch(1 0 0 / 0.15);
+  --shadow-xl:
+    0 16px 48px oklch(0.15 0.01 75 / 0.16),
+    0 6px 16px oklch(0.15 0.01 75 / 0.10),
+    inset 0 1px 0 oklch(1 0 0 / 0.12);
+
+  /* ── Pressed / Inset Shadows (for active/depressed states) ── */
+  --shadow-pressed:
+    inset 0 2px 6px oklch(0.15 0.01 75 / 0.20),
+    inset 0 1px 2px oklch(0.15 0.01 75 / 0.12);
+  --shadow-input-well:
+    inset 0 2px 4px oklch(0.15 0.01 75 / 0.10),
+    inset 0 1px 2px oklch(0.15 0.01 75 / 0.06),
+    0 1px 0 oklch(1 0 0 / 0.60);
+  --shadow-input-focus:
+    inset 0 2px 4px oklch(0.15 0.01 75 / 0.08),
+    0 0 0 3px oklch(0.55 0.24 270 / 0.18),
+    0 0 12px oklch(0.55 0.24 270 / 0.08);
+
+  /* ── Glow effects ── */
+  --shadow-glow-accent:
+    0 0 12px oklch(0.55 0.24 270 / 0.25),
+    0 0 4px oklch(0.55 0.24 270 / 0.15);
+  --shadow-glow-danger:
+    0 0 12px oklch(0.58 0.22 25 / 0.25),
+    0 0 4px oklch(0.58 0.22 25 / 0.15);
 
   /* ── Animation ── */
   --animate-fade-in: fade-in 0.15s ease-out;
@@ -69,7 +107,20 @@
     from { opacity: 0; transform: translateY(-16px); }
     to { opacity: 1; transform: translateY(0); }
   }
+  @keyframes neo-press {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.97); }
+    100% { transform: scale(1); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
 }
+
+/* ═══════════════════════════════════════════════
+   Google Fonts preload (DM Sans)
+   ═══════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════
    Global Reset & Base
@@ -93,18 +144,23 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   letter-spacing: -0.011em;
   font-size: 15px;
   line-height: 1.5;
+  /* Subtle warm ambient gradient across the entire page */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.95 0.02 270 / 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, oklch(0.90 0.03 50 / 0.05), transparent);
+  background-attachment: fixed;
 }
 
 /* ═══════════════════════════════════════════════
    Typography Scale — 8px baseline grid
+   DM Sans: heavy labels (700), regular body (400)
    ═══════════════════════════════════════════════ */
 .text-page-title {
   font-size: 1.375rem;
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.25;
   color: var(--color-gray-900);
@@ -133,8 +189,8 @@ body {
 
 .text-label {
   font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--color-gray-500);
   text-transform: uppercase;
 }
@@ -147,27 +203,27 @@ body {
 }
 
 /* ═══════════════════════════════════════════════
-   Scrollbar — barely visible
+   Scrollbar — barely visible, tactile feel
    ═══════════════════════════════════════════════ */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
 }
 @media (min-width: 768px) {
   ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
   }
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-gray-200);
+  background: var(--color-gray-300);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-gray-300);
+  background: var(--color-gray-400);
 }
 
 /* ═══════════════════════════════════════════════
@@ -187,15 +243,20 @@ body {
 }
 
 /* ═══════════════════════════════════════════════
-   Calendar Cells
+   Calendar Cells — Neo-Skeu physical keys
    ═══════════════════════════════════════════════ */
 @media (hover: hover) {
   .calendar-cell:hover {
-    background-color: var(--color-gray-50);
+    background-color: var(--color-gray-100);
+    box-shadow: var(--shadow-xs);
   }
 }
 .calendar-cell {
-  transition: background-color 0.1s ease;
+  transition: background-color 0.1s ease, box-shadow 0.12s ease, transform 0.1s ease;
+}
+.calendar-cell:active {
+  transform: scale(0.95);
+  box-shadow: var(--shadow-pressed);
 }
 
 /* ═══════════════════════════════════════════════
@@ -225,65 +286,84 @@ body {
    ═══════════════════════════════════════════════ */
 .swipe-indicator {
   width: 32px;
-  height: 3px;
-  border-radius: 1.5px;
+  height: 3.5px;
+  border-radius: 2px;
   background: var(--color-gray-300);
   margin: 10px auto 6px;
+  box-shadow: inset 0 1px 1px oklch(0.15 0.01 75 / 0.15);
 }
 
 /* ═══════════════════════════════════════════════
-   Card — single reusable container
-   No blur, no glass, just clean surface
+   Card — Neo-Skeuomorphic raised surface
+   Soft physical depth with inner light rim
    ═══════════════════════════════════════════════ */
 .card {
   background: var(--color-surface);
   border: 1px solid var(--color-gray-200);
-  border-radius: 10px;
-  box-shadow: var(--shadow-xs);
+  border-radius: 12px;
+  box-shadow:
+    0 2px 6px oklch(0.15 0.01 75 / 0.10),
+    0 1px 2px oklch(0.15 0.01 75 / 0.06),
+    inset 0 1px 0 oklch(1 0 0 / 0.50);
 }
 .card-elevated {
   background: var(--color-surface);
   border: 1px solid var(--color-gray-150);
-  border-radius: 10px;
-  box-shadow: var(--shadow-sm);
+  border-radius: 12px;
+  box-shadow:
+    0 4px 16px oklch(0.15 0.01 75 / 0.12),
+    0 2px 4px oklch(0.15 0.01 75 / 0.08),
+    inset 0 1px 0 oklch(1 0 0 / 0.60);
 }
 
 /* ═══════════════════════════════════════════════
-   Focus Ring — accent colored
+   Focus Ring — accent glow
    ═══════════════════════════════════════════════ */
 .focus-ring {
   outline: none;
 }
 .focus-ring:focus-visible {
-  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent-500);
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-accent-500),
+    0 0 8px oklch(0.55 0.24 270 / 0.20);
 }
 
 /* ═══════════════════════════════════════════════
    Interactive States — input/select base
+   Neo-Skeu: embossed input wells
    ═══════════════════════════════════════════════ */
 .input-base {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--color-gray-200);
   background: var(--color-surface);
   color: var(--color-gray-900);
   font-size: 0.9375rem;
   line-height: 1.5;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.2s ease;
   outline: none;
+  box-shadow:
+    inset 0 2px 4px oklch(0.15 0.01 75 / 0.08),
+    inset 0 1px 2px oklch(0.15 0.01 75 / 0.05),
+    0 1px 0 oklch(1 0 0 / 0.50);
 }
 .input-base::placeholder {
   color: var(--color-gray-400);
 }
 .input-base:focus {
   border-color: var(--color-accent-400);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow:
+    inset 0 2px 4px oklch(0.15 0.01 75 / 0.06),
+    0 0 0 3px oklch(0.55 0.24 270 / 0.15),
+    0 0 12px oklch(0.55 0.24 270 / 0.06);
 }
 .input-base:disabled {
-  background: var(--color-gray-50);
+  background: var(--color-gray-100);
   color: var(--color-gray-400);
   cursor: not-allowed;
+  box-shadow: inset 0 1px 2px oklch(0.15 0.01 75 / 0.06);
 }
 @media (min-width: 768px) {
   .input-base {
@@ -296,7 +376,10 @@ body {
    Drag Overlay
    ═══════════════════════════════════════════════ */
 .drag-overlay {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 12px 40px oklch(0.15 0.01 75 / 0.18),
+    0 4px 12px oklch(0.15 0.01 75 / 0.10),
+    inset 0 1px 0 oklch(1 0 0 / 0.20);
   transform: rotate(0.5deg) scale(1.005);
 }
 
@@ -322,7 +405,7 @@ body {
 }
 .page-header h1 {
   font-size: 1.375rem;
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.25;
   color: var(--color-gray-900);
@@ -339,4 +422,51 @@ body {
   .page-header p {
     font-size: 0.875rem;
   }
+}
+
+/* ═══════════════════════════════════════════════
+   Neo-Skeuomorphic Utility Classes
+   ═══════════════════════════════════════════════ */
+
+/* Raised surface (default state for buttons, cards) */
+.neo-raised {
+  box-shadow:
+    0 2px 4px oklch(0.15 0.01 75 / 0.18),
+    0 1px 2px oklch(0.15 0.01 75 / 0.10),
+    inset 0 1px 0 oklch(1 0 0 / 0.15);
+}
+
+/* Depressed surface (active/pressed state) */
+.neo-pressed {
+  box-shadow:
+    inset 0 2px 6px oklch(0.15 0.01 75 / 0.20),
+    inset 0 1px 2px oklch(0.15 0.01 75 / 0.12);
+}
+
+/* Frosted glass panel */
+.neo-glass {
+  background: oklch(0.99 0.003 80 / 0.85);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid oklch(1 0 0 / 0.50);
+  box-shadow:
+    0 8px 32px oklch(0.15 0.01 75 / 0.14),
+    0 2px 8px oklch(0.15 0.01 75 / 0.08),
+    inset 0 1px 0 oklch(1 0 0 / 0.40);
+}
+
+/* Ambient light top highlight for surfaces */
+.neo-ambient {
+  position: relative;
+}
+.neo-ambient::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.50), transparent);
+  border-radius: 1px;
+  pointer-events: none;
 }

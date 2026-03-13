@@ -1,5 +1,12 @@
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
+/**
+ * Neo-Skeuomorphism Form Fields
+ * - Inputs feel like embossed wells (inset shadows)
+ * - Glowing inner border on focus using box-shadow (no outline)
+ * - CheckboxGroup: tactile toggle chips with press animation
+ */
+
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
@@ -11,7 +18,7 @@ export function Input({ label, error, helperText, className = '', id, ...props }
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={inputId} className="block text-[13px] font-medium text-gray-700">
+        <label htmlFor={inputId} className="block text-[13px] font-semibold text-gray-600">
           {label}
           {props.required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
@@ -20,14 +27,17 @@ export function Input({ label, error, helperText, className = '', id, ...props }
         id={inputId}
         className={`
           input-base
-          ${error ? '!border-red-300 focus:!ring-red-100 focus:!border-red-400' : ''}
+          ${error
+            ? '!border-red-300 !shadow-[inset_0_2px_4px_oklch(0.4_0.15_25/0.10),0_0_0_3px_oklch(0.58_0.22_25/0.12)] focus:!shadow-[inset_0_2px_4px_oklch(0.4_0.15_25/0.08),0_0_0_3px_oklch(0.58_0.22_25/0.18),0_0_12px_oklch(0.58_0.22_25/0.08)]'
+            : ''
+          }
           ${className}
         `}
         aria-invalid={!!error}
         aria-describedby={error ? `${inputId}-error` : undefined}
         {...props}
       />
-      {error && <p id={`${inputId}-error`} className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && <p id={`${inputId}-error`} className="text-xs font-medium text-red-500 mt-1">{error}</p>}
       {helperText && !error && <p className="text-xs text-gray-400 mt-1">{helperText}</p>}
     </div>
   );
@@ -45,7 +55,7 @@ export function Select({ label, error, options, placeholder, className = '', id,
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={selectId} className="block text-[13px] font-medium text-gray-700">
+        <label htmlFor={selectId} className="block text-[13px] font-semibold text-gray-600">
           {label}
           {props.required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
@@ -54,7 +64,10 @@ export function Select({ label, error, options, placeholder, className = '', id,
         id={selectId}
         className={`
           input-base appearance-none
-          ${error ? '!border-red-300 focus:!ring-red-100 focus:!border-red-400' : ''}
+          ${error
+            ? '!border-red-300 !shadow-[inset_0_2px_4px_oklch(0.4_0.15_25/0.10),0_0_0_3px_oklch(0.58_0.22_25/0.12)] focus:!shadow-[inset_0_2px_4px_oklch(0.4_0.15_25/0.08),0_0_0_3px_oklch(0.58_0.22_25/0.18),0_0_12px_oklch(0.58_0.22_25/0.08)]'
+            : ''
+          }
           ${className}
         `}
         aria-invalid={!!error}
@@ -66,7 +79,7 @@ export function Select({ label, error, options, placeholder, className = '', id,
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
-      {error && <p id={`${selectId}-error`} className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && <p id={`${selectId}-error`} className="text-xs font-medium text-red-500 mt-1">{error}</p>}
     </div>
   );
 }
@@ -83,7 +96,7 @@ export function Textarea({ label, error, showCharCount, className = '', id, ...p
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={textareaId} className="block text-[13px] font-medium text-gray-700">
+        <label htmlFor={textareaId} className="block text-[13px] font-semibold text-gray-600">
           {label}
           {props.required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
@@ -92,7 +105,10 @@ export function Textarea({ label, error, showCharCount, className = '', id, ...p
         id={textareaId}
         className={`
           input-base resize-y min-h-[80px]
-          ${error ? '!border-red-300 focus:!ring-red-100 focus:!border-red-400' : ''}
+          ${error
+            ? '!border-red-300 !shadow-[inset_0_2px_4px_oklch(0.4_0.15_25/0.10),0_0_0_3px_oklch(0.58_0.22_25/0.12)] focus:!shadow-[inset_0_2px_4px_oklch(0.4_0.15_25/0.08),0_0_0_3px_oklch(0.58_0.22_25/0.18),0_0_12px_oklch(0.58_0.22_25/0.08)]'
+            : ''
+          }
           ${className}
         `}
         aria-invalid={!!error}
@@ -100,9 +116,9 @@ export function Textarea({ label, error, showCharCount, className = '', id, ...p
         {...props}
       />
       <div className="flex items-center justify-between">
-        {error ? <p id={`${textareaId}-error`} className="text-xs text-red-500">{error}</p> : <span />}
+        {error ? <p id={`${textareaId}-error`} className="text-xs font-medium text-red-500">{error}</p> : <span />}
         {(showCharCount || props.maxLength) && (
-          <span className={`text-[10px] ${props.maxLength && charCount >= props.maxLength ? 'text-red-500' : 'text-gray-400'}`}>
+          <span className={`text-[10px] font-medium ${props.maxLength && charCount >= props.maxLength ? 'text-red-500' : 'text-gray-400'}`}>
             {charCount}{props.maxLength ? `/${props.maxLength}` : ''}
           </span>
         )}
@@ -129,7 +145,7 @@ export function CheckboxGroup({ label, options, value, onChange }: CheckboxGroup
 
   return (
     <div className="space-y-1.5">
-      {label && <label className="block text-[13px] font-medium text-gray-700">{label}</label>}
+      {label && <label className="block text-[13px] font-semibold text-gray-600">{label}</label>}
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
           <button
@@ -137,10 +153,11 @@ export function CheckboxGroup({ label, options, value, onChange }: CheckboxGroup
             type="button"
             onClick={() => toggle(opt)}
             className={`
-              px-3 py-1.5 rounded-[6px] text-[13px] font-medium border transition-all duration-150 min-h-[32px]
+              px-3 py-1.5 rounded-[8px] text-[13px] font-semibold border transition-all duration-[120ms] min-h-[32px]
+              active:scale-[0.97]
               ${value.includes(opt)
-                ? 'bg-accent-600 border-accent-600 text-white shadow-xs'
-                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 active:bg-gray-50'
+                ? 'bg-accent-600 border-accent-700 text-white shadow-[0_2px_4px_oklch(0.3_0.15_270/0.25),inset_0_1px_0_oklch(1_0_0/0.12)]'
+                : 'bg-white border-gray-200 text-gray-600 shadow-[0_1px_3px_oklch(0.15_0.01_75/0.10),inset_0_1px_0_oklch(1_0_0/0.50)] hover:border-gray-300 hover:shadow-[0_2px_6px_oklch(0.15_0.01_75/0.12),inset_0_1px_0_oklch(1_0_0/0.60)] active:shadow-[inset_0_2px_4px_oklch(0.15_0.01_75/0.15)]'
               }
             `}
           >

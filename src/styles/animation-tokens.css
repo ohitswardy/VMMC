@@ -1,0 +1,167 @@
+/* ═══════════════════════════════════════════════════════════════════
+   VMMC Neo-Skeuomorphism — Animation Design Tokens
+   Single source of truth for all motion: easing, durations, keyframes.
+   Integrates with the existing oklch color system in index.css.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Physics-Based Easing Curves ── */
+:root {
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-snap:   cubic-bezier(0.87, 0, 0.13, 1);
+  --ease-float:  cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-settle: cubic-bezier(0.55, 0, 0.1, 1);
+  --ease-rubber: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* ── Duration Scale ── */
+  --dur-instant:  80ms;
+  --dur-fast:     120ms;
+  --dur-normal:   200ms;
+  --dur-slow:     350ms;
+  --dur-entrance: 450ms;
+
+  /* ── Stagger Formula ── */
+  --stagger-step: 60ms;
+}
+
+/* ── Keyframes ── */
+
+@keyframes neo-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes neo-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes neo-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes neo-ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+@keyframes neo-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes neo-counter-tick {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes neo-pulse-gentle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+@keyframes neo-sparkline-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Card Texture — subtle noise grain overlay ──
+   Applied via ::after pseudo-element on cards. 3% opacity. */
+.neo-texture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px;
+  mix-blend-mode: multiply;
+}
+
+/* ── Gradient border for directional light ──
+   Light top edge, transparent sides, dark bottom edge. */
+.neo-light-border {
+  border: 1px solid transparent;
+  border-image:
+    linear-gradient(
+      to bottom,
+      oklch(1 0 0 / 0.25),
+      oklch(1 0 0 / 0.06) 40%,
+      oklch(0.15 0.01 75 / 0.08) 100%
+    ) 1;
+  border-radius: inherit;
+}
+
+/* ── Shimmer skeleton loading ── */
+.neo-shimmer {
+  background:
+    linear-gradient(
+      90deg,
+      oklch(0.96 0.003 80) 25%,
+      oklch(0.98 0.002 80) 50%,
+      oklch(0.96 0.003 80) 75%
+    );
+  background-size: 200% 100%;
+  animation: neo-shimmer 1.5s ease-in-out infinite;
+}
+
+/* ── Empty state dashed border ── */
+.neo-empty {
+  border: 2px dashed oklch(0.86 0.005 80);
+  animation: neo-pulse-gentle 2.5s ease-in-out infinite;
+}

@@ -14,6 +14,7 @@ import DocumentsPage from './pages/DocumentsPage';
 import AuditLogsPage from './pages/AuditLogsPage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
+import CardShowcasePage from './pages/CardShowcasePage';
 import {
   useNotificationsStore,
   useBookingsStore,
@@ -333,6 +334,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="showcase" element={<CardShowcasePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/calendar" replace />} />
       </Routes>

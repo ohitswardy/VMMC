@@ -2,6 +2,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useEffect, useRef, useCallback, type ReactNode } from 'react';
 
+/**
+ * Neo-Skeuomorphism Modal / Dialog
+ * - Frosted backdrop with blur
+ * - Panel: raised surface with layered shadows + inner highlight
+ * - Close button: tactile raised surface
+ * - Bottom sheet on mobile with swipe indicator
+ */
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -33,8 +41,7 @@ export default function Modal({ isOpen, onClose, title, titleExtra, children, si
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
 
-  // Stable focus-trap handler — never recreated, so the effect below
-  // only runs when `isOpen` actually changes.
+  // Stable focus-trap handler
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       onCloseRef.current();
@@ -61,7 +68,7 @@ export default function Modal({ isOpen, onClose, title, titleExtra, children, si
         first.focus();
       }
     }
-  }, []); // stable — no deps
+  }, []);
 
   // Track whether this modal instance locked scroll
   const didLockScrollRef = useRef(false);
@@ -103,7 +110,7 @@ export default function Modal({ isOpen, onClose, title, titleExtra, children, si
       }
     }
 
-    // Cleanup on unmount: always release scroll lock if this instance holds it
+    // Cleanup on unmount
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       if (didLockScrollRef.current) {
@@ -125,37 +132,61 @@ export default function Modal({ isOpen, onClose, title, titleExtra, children, si
           transition={{ duration: 0.15 }}
           onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
         >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-gray-950/40" aria-hidden="true" />
+          {/* Frosted Backdrop */}
+          <div
+            className="absolute inset-0 bg-gray-950/35 backdrop-blur-sm"
+            aria-hidden="true"
+          />
 
-          {/* Panel — bottom sheet on mobile, centered on desktop */}
+          {/* Panel — raised neo-skeu surface */}
           <motion.div
             ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`relative w-full ${sizeClasses[size]} bg-white rounded-t-[16px] md:rounded-[12px] overflow-hidden max-h-[92vh] md:max-h-[85vh] flex flex-col`}
-            style={{ boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.15)' }}
+            className={`relative w-full ${sizeClasses[size]}
+              bg-white/95 backdrop-blur-md
+              rounded-t-[18px] md:rounded-[14px] overflow-hidden
+              max-h-[92vh] md:max-h-[85vh] flex flex-col
+              border border-white/60`}
+            style={{
+              boxShadow: [
+                '0 24px 64px -12px oklch(0.15 0.01 75 / 0.20)',
+                '0 8px 24px oklch(0.15 0.01 75 / 0.10)',
+                'inset 0 1px 0 oklch(1 0 0 / 0.60)',
+              ].join(', '),
+            }}
             initial={{ y: '100%', opacity: 1 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 1 }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
+            {/* Ambient top highlight */}
+            <div
+              className="absolute top-0 left-4 right-4 h-px pointer-events-none"
+              style={{ background: 'linear-gradient(90deg, transparent, oklch(1 0 0 / 0.60), transparent)' }}
+            />
+
             {/* Swipe handle (mobile) */}
             <div className="md:hidden swipe-indicator" />
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 md:px-6 md:py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-5 py-3.5 md:px-6 md:py-4 border-b border-gray-200/60">
               <div className="flex items-center gap-2.5 min-w-0">
-                <h2 id={titleId} className="text-[15px] md:text-base font-semibold text-gray-900 shrink-0">{title}</h2>
+                <h2 id={titleId} className="text-[15px] md:text-base font-bold text-gray-900 shrink-0">{title}</h2>
                 {titleExtra && <span className="text-[11px] text-gray-500 truncate">{titleExtra}</span>}
               </div>
               <button
                 onClick={onClose}
-                className="p-2 -mr-1 rounded-[8px] hover:bg-gray-100 active:bg-gray-150 transition-colors touch-target"
+                className="p-2 -mr-1 rounded-[10px] touch-target
+                  bg-gray-100 border border-gray-200
+                  shadow-[0_1px_2px_oklch(0.15_0.01_75/0.08),inset_0_1px_0_oklch(1_0_0/0.50)]
+                  hover:bg-gray-150 hover:shadow-[0_2px_4px_oklch(0.15_0.01_75/0.10),inset_0_1px_0_oklch(1_0_0/0.60)]
+                  active:shadow-[inset_0_1px_3px_oklch(0.15_0.01_75/0.15)] active:scale-[0.95]
+                  transition-all duration-[120ms]"
                 aria-label="Close modal"
               >
-                <X className="w-4 h-4 text-gray-400" />
+                <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
 
