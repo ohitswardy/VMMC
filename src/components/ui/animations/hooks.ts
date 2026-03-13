@@ -80,7 +80,7 @@ export function useViewportEntry(
  */
 export function useShadowDepth() {
   const [depth, setDepth] = useState(0); // 0 = resting, 1 = hover, -1 = pressed
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const handlers = {
     onMouseEnter: () => {

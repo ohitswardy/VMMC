@@ -45,25 +45,22 @@ const SHADOW_PRESSED = [
 const cardVariants = cva(
   [
     'relative rounded-xl overflow-hidden',
-    'neo-texture', // noise grain overlay via ::after
+    'neo-texture',
     'transition-all',
   ],
   {
     variants: {
       variant: {
-        flat: 'bg-surface border border-gray-200',
-        glass: [
-          'bg-white/65 backdrop-blur-[20px] backdrop-saturate-[180%]',
-          'border border-white/20',
-        ].join(' '),
-        tilt: 'bg-surface border border-gray-200',
+        flat:     'bg-surface border border-gray-200',
+        glass:    'bg-white/65 backdrop-blur-[20px] backdrop-saturate-[180%] border border-white/20',
+        tilt:     'bg-surface border border-gray-200',
         magnetic: 'bg-surface border border-gray-200',
       },
       padding: {
         none: '',
-        sm: 'p-4',
-        md: 'p-5 md:p-6',
-        lg: 'p-6 md:p-8',
+        sm:   'p-4',
+        md:   'p-5 md:p-6',
+        lg:   'p-6 md:p-8',
       },
     },
     defaultVariants: {
@@ -73,24 +70,41 @@ const cardVariants = cva(
   }
 );
 
-/* ── Shared props ── */
+/* ── Shared props ──
+   Omit HTML event handlers that clash with Framer Motion's overloaded signatures.
+   - onDrag* : FM uses (event, PanInfo) — HTML uses DragEventHandler
+   - onAnimationStart/End/Iteration : FM uses (AnimationDefinition) — HTML uses AnimationEventHandler
+   Cards don't expose any of these anyway.                                          */
+type OmitMotionConflicts<T> = Omit<
+  T,
+  | 'onDrag' | 'onDragStart' | 'onDragEnd' | 'onDragOver'
+  | 'onDragEnter' | 'onDragLeave' | 'onDragCapture'
+  | 'onDragStartCapture' | 'onDragEndCapture'
+  | 'onDragOverCapture' | 'onDragEnterCapture' | 'onDragLeaveCapture'
+  | 'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration'
+  | 'onAnimationStartCapture' | 'onAnimationEndCapture' | 'onAnimationIterationCapture'
+>;
+
 interface CardBaseProps
-  extends Omit<HTMLAttributes<HTMLDivElement>, 'onClick'>,
+  extends OmitMotionConflicts<Omit<HTMLAttributes<HTMLDivElement>, 'onClick'>>,
     VariantProps<typeof cardVariants> {
-  children: ReactNode;
+  /** children is optional — loading skeletons render without it */
+  children?: ReactNode;
   onClick?: (e: ReactMouseEvent<HTMLDivElement>) => void;
-  /** Show shimmer skeleton loading. */
   loading?: boolean;
-  /** Show dashed empty state. */
   empty?: boolean;
   className?: string;
 }
 
-/* ═══════════ Card.Flat ═══════════
-   Default elevated card.
-   Hover: lift -4px, expand shadow.
-   Active: push down +2px, compress shadow.
-   ═══════════════════════════════════ */
+/* top-edge ambient highlight shared across all variants */
+const TopHighlight = () => (
+  <div
+    className="absolute top-0 left-3 right-3 h-px pointer-events-none z-10"
+    style={{ background: 'linear-gradient(90deg, transparent, oklch(1 0 0 / 0.45), transparent)' }}
+  />
+);
+
+/* ═══════════ Card.Flat ═══════════ */
 export const CardFlat = forwardRef<HTMLDivElement, CardBaseProps>(
   function CardFlat({ children, onClick, loading, empty, className = '', padding, ...props }, ref) {
     const reduced = useReducedMotion();
@@ -128,34 +142,19 @@ export const CardFlat = forwardRef<HTMLDivElement, CardBaseProps>(
         onClick={onClick}
         tabIndex={interactive ? 0 : undefined}
         role={interactive ? 'button' : undefined}
-        whileHover={
-          interactive && !reduced
-            ? { y: -4, boxShadow: SHADOW_HOVER }
-            : undefined
-        }
-        whileTap={
-          interactive && !reduced
-            ? { y: 2, boxShadow: SHADOW_PRESSED, scale: 0.99 }
-            : undefined
-        }
+        whileHover={interactive && !reduced ? { y: -4, boxShadow: SHADOW_HOVER } : undefined}
+        whileTap={interactive && !reduced ? { y: 2, boxShadow: SHADOW_PRESSED, scale: 0.99 } : undefined}
         transition={{ duration: 0.2, ease: ease.float }}
         {...props}
       >
-        {/* Ambient top highlight */}
-        <div
-          className="absolute top-0 left-3 right-3 h-px pointer-events-none z-10"
-          style={{ background: 'linear-gradient(90deg, transparent, oklch(1 0 0 / 0.45), transparent)' }}
-        />
+        <TopHighlight />
         {children}
       </motion.div>
     );
   }
 );
 
-/* ═══════════ Card.Glass ═══════════
-   Frosted glass card.
-   Hover: increase blur + brightness.
-   ═══════════════════════════════════ */
+/* ═══════════ Card.Glass ═══════════ */
 export const CardGlass = forwardRef<HTMLDivElement, CardBaseProps>(
   function CardGlass({ children, onClick, loading, empty, className = '', padding, ...props }, ref) {
     const reduced = useReducedMotion();
@@ -199,35 +198,20 @@ export const CardGlass = forwardRef<HTMLDivElement, CardBaseProps>(
         onClick={onClick}
         tabIndex={interactive ? 0 : undefined}
         role={interactive ? 'button' : undefined}
-        whileHover={
-          interactive && !reduced
-            ? {
-                backdropFilter: 'blur(28px) saturate(200%)',
-                WebkitBackdropFilter: 'blur(28px) saturate(200%)',
-                backgroundColor: 'oklch(1 0 0 / 0.72)',
-              }
-            : undefined
-        }
-        whileTap={
-          interactive && !reduced ? { scale: 0.98 } : undefined
-        }
+        /* WebkitBackdropFilter removed — not in TargetAndTransition; Tailwind handles vendor prefix */
+        whileHover={interactive && !reduced ? { backdropFilter: 'blur(28px) saturate(200%)', backgroundColor: 'oklch(1 0 0 / 0.72)' } : undefined}
+        whileTap={interactive && !reduced ? { scale: 0.98 } : undefined}
         transition={{ duration: 0.2, ease: ease.float }}
         {...props}
       >
-        <div
-          className="absolute top-0 left-3 right-3 h-px pointer-events-none z-10"
-          style={{ background: 'linear-gradient(90deg, transparent, oklch(1 0 0 / 0.50), transparent)' }}
-        />
+        <TopHighlight />
         {children}
       </motion.div>
     );
   }
 );
 
-/* ═══════════ Card.Tilt ═══════════
-   3D perspective tilt on hover.
-   Specular highlight moves opposite to tilt.
-   ═══════════════════════════════════ */
+/* ═══════════ Card.Tilt ═══════════ */
 export const CardTilt = forwardRef<HTMLDivElement, CardBaseProps>(
   function CardTilt({ children, onClick, loading, empty, className = '', padding, ...props }, ref) {
     const reduced = useReducedMotion();
@@ -237,25 +221,21 @@ export const CardTilt = forwardRef<HTMLDivElement, CardBaseProps>(
 
     const x = useMotionValue(0);
     const y = useMotionValue(0);
-    const springConfig = { stiffness: 300, damping: 20, mass: 0.6 };
-    const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [12, -12]), springConfig);
-    const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-12, 12]), springConfig);
+    const springCfg = { stiffness: 300, damping: 20, mass: 0.6 };
+    const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [12, -12]), springCfg);
+    const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-12, 12]), springCfg);
 
-    const handleMouseMove = useCallback(
-      (e: ReactMouseEvent) => {
-        if (reduced) return;
-        const el = innerRef.current;
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        const nx = (e.clientX - rect.left) / rect.width - 0.5;
-        const ny = (e.clientY - rect.top) / rect.height - 0.5;
-        x.set(nx);
-        y.set(ny);
-        // Specular highlight opposite to cursor
-        setSpecular({ x: (1 - (nx + 0.5)) * 100, y: (1 - (ny + 0.5)) * 100 });
-      },
-      [reduced, x, y]
-    );
+    const handleMouseMove = useCallback((e: ReactMouseEvent) => {
+      if (reduced) return;
+      const el = innerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const nx = (e.clientX - rect.left) / rect.width - 0.5;
+      const ny = (e.clientY - rect.top) / rect.height - 0.5;
+      x.set(nx);
+      y.set(ny);
+      setSpecular({ x: (1 - (nx + 0.5)) * 100, y: (1 - (ny + 0.5)) * 100 });
+    }, [reduced, x, y]);
 
     const handleMouseLeave = useCallback(() => {
       x.set(0);
@@ -292,12 +272,7 @@ export const CardTilt = forwardRef<HTMLDivElement, CardBaseProps>(
         <motion.div
           ref={innerRef}
           className={`${cardVariants({ variant: 'tilt', padding })} ${interactive ? 'cursor-pointer' : ''} ${className}`}
-          style={{
-            boxShadow: SHADOW_REST,
-            transformStyle: 'preserve-3d',
-            rotateX,
-            rotateY,
-          }}
+          style={{ boxShadow: SHADOW_REST, transformStyle: 'preserve-3d', rotateX, rotateY }}
           onClick={onClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
@@ -305,7 +280,6 @@ export const CardTilt = forwardRef<HTMLDivElement, CardBaseProps>(
           role={interactive ? 'button' : undefined}
           {...props}
         >
-          {/* Specular highlight */}
           <div
             className="absolute inset-0 rounded-xl pointer-events-none z-10 transition-opacity duration-200"
             style={{
@@ -313,10 +287,7 @@ export const CardTilt = forwardRef<HTMLDivElement, CardBaseProps>(
               opacity: reduced ? 0 : 1,
             }}
           />
-          <div
-            className="absolute top-0 left-3 right-3 h-px pointer-events-none z-10"
-            style={{ background: 'linear-gradient(90deg, transparent, oklch(1 0 0 / 0.45), transparent)' }}
-          />
+          <TopHighlight />
           {children}
         </motion.div>
       </div>
@@ -324,10 +295,7 @@ export const CardTilt = forwardRef<HTMLDivElement, CardBaseProps>(
   }
 );
 
-/* ═══════════ Card.Magnetic ═══════════
-   Entire card follows cursor with spring.
-   Shadow shifts direction with movement.
-   ═══════════════════════════════════════ */
+/* ═══════════ Card.Magnetic ═══════════ */
 export const CardMagnetic = forwardRef<HTMLDivElement, CardBaseProps>(
   function CardMagnetic({ children, onClick, loading, empty, className = '', padding, ...props }, ref) {
     const reduced = useReducedMotion();
@@ -337,23 +305,18 @@ export const CardMagnetic = forwardRef<HTMLDivElement, CardBaseProps>(
 
     const x = useMotionValue(0);
     const y = useMotionValue(0);
-    const springConfig = { stiffness: 400, damping: 15, mass: 0.5 };
-    const springX = useSpring(x, springConfig);
-    const springY = useSpring(y, springConfig);
+    const springCfg = { stiffness: 400, damping: 15, mass: 0.5 };
+    const springX = useSpring(x, springCfg);
+    const springY = useSpring(y, springCfg);
 
-    const handleMouseMove = useCallback(
-      (e: ReactMouseEvent) => {
-        if (reduced) return;
-        const el = innerRef.current;
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        const nx = (e.clientX - rect.left) / rect.width - 0.5;
-        const ny = (e.clientY - rect.top) / rect.height - 0.5;
-        x.set(nx * 16); // max 8px displacement
-        y.set(ny * 12); // max 6px displacement
-      },
-      [reduced, x, y]
-    );
+    const handleMouseMove = useCallback((e: ReactMouseEvent) => {
+      if (reduced) return;
+      const el = innerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      x.set(((e.clientX - rect.left) / rect.width - 0.5) * 16);
+      y.set(((e.clientY - rect.top)  / rect.height - 0.5) * 12);
+    }, [reduced, x, y]);
 
     const handleMouseLeave = useCallback(() => {
       x.set(0);
@@ -393,17 +356,9 @@ export const CardMagnetic = forwardRef<HTMLDivElement, CardBaseProps>(
           else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
         }}
         className={`${cardVariants({ variant: 'magnetic', padding })} ${interactive ? 'cursor-pointer' : ''} ${className}`}
-        style={{
-          boxShadow: SHADOW_REST,
-          x: reduced ? 0 : springX,
-          y: reduced ? 0 : springY,
-          ...shadowStyle,
-        }}
+        style={{ boxShadow: SHADOW_REST, x: reduced ? 0 : springX, y: reduced ? 0 : springY, ...shadowStyle }}
         onClick={onClick}
-        onMouseMove={(e) => {
-          handleMouseMove(e);
-          shadowHandlers.onMouseEnter();
-        }}
+        onMouseMove={(e) => { handleMouseMove(e); shadowHandlers.onMouseEnter(); }}
         onMouseLeave={handleMouseLeave}
         onMouseDown={shadowHandlers.onMouseDown}
         onMouseUp={shadowHandlers.onMouseUp}
@@ -411,24 +366,16 @@ export const CardMagnetic = forwardRef<HTMLDivElement, CardBaseProps>(
         role={interactive ? 'button' : undefined}
         {...props}
       >
-        <div
-          className="absolute top-0 left-3 right-3 h-px pointer-events-none z-10"
-          style={{ background: 'linear-gradient(90deg, transparent, oklch(1 0 0 / 0.45), transparent)' }}
-        />
+        <TopHighlight />
         {children}
       </motion.div>
     );
   }
 );
 
-/* ═══════════ Card.Expandable ═══════════
-   Click to expand with layout animation.
-   CSS grid-template-rows 0fr → 1fr.
-   ═════════════════════════════════════════ */
+/* ═══════════ Card.Expandable ═══════════ */
 interface CardExpandableProps extends CardBaseProps {
-  /** Summary content shown in collapsed state. */
   summary: ReactNode;
-  /** Whether to start expanded. */
   defaultExpanded?: boolean;
 }
 
@@ -467,12 +414,8 @@ export const CardExpandable = forwardRef<HTMLDivElement, CardExpandableProps>(
         layout={!reduced}
         transition={{ duration: 0.25, ease: ease.float }}
       >
-        <div
-          className="absolute top-0 left-3 right-3 h-px pointer-events-none z-10"
-          style={{ background: 'linear-gradient(90deg, transparent, oklch(1 0 0 / 0.45), transparent)' }}
-        />
+        <TopHighlight />
 
-        {/* Summary — always visible, clickable */}
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -490,7 +433,6 @@ export const CardExpandable = forwardRef<HTMLDivElement, CardExpandableProps>(
           </motion.div>
         </button>
 
-        {/* Expandable detail content */}
         <AnimatePresence initial={false}>
           {expanded && (
             <motion.div
@@ -498,8 +440,8 @@ export const CardExpandable = forwardRef<HTMLDivElement, CardExpandableProps>(
               animate={{ height: 'auto', opacity: 1 }}
               exit={reduced ? undefined : { height: 0, opacity: 0 }}
               transition={{
-                height: { duration: 0.25, ease: ease.float },
-                opacity: { duration: 0.15, delay: 0.08, ease: 'easeOut' },
+                height:   { duration: 0.25, ease: ease.float },
+                opacity:  { duration: 0.15, delay: 0.08, ease: 'easeOut' },
               }}
               className="overflow-hidden"
             >
@@ -514,57 +456,33 @@ export const CardExpandable = forwardRef<HTMLDivElement, CardExpandableProps>(
   }
 );
 
-/* ═══════════ Card.Stat ═══════════
-   Data/metric card with animated counter,
-   trend indicator, and sparkline.
-   ═════════════════════════════════════ */
+/* ═══════════ Card.Stat ═══════════ */
 interface CardStatProps extends Omit<CardBaseProps, 'children'> {
-  /** The metric label */
   label: string;
-  /** The numeric value to animate to */
   value: number;
-  /** Unit suffix (e.g. "%", "hrs") */
   suffix?: string;
-  /** Prefix (e.g. "$", "#") */
   prefix?: string;
-  /** Trend direction */
   trend?: 'up' | 'down' | 'neutral';
-  /** Trend label (e.g. "+12%") */
   trendLabel?: string;
-  /** Sparkline data points (y-values) */
   sparkline?: number[];
-  /** Icon to show */
   icon?: ReactNode;
 }
 
 export const CardStat = forwardRef<HTMLDivElement, CardStatProps>(
   function CardStat({
-    label,
-    value,
-    suffix = '',
-    prefix = '',
-    trend,
-    trendLabel,
-    sparkline,
-    icon,
-    onClick,
-    loading,
-    className = '',
-    ...props
+    label, value, suffix = '', prefix = '', trend, trendLabel,
+    sparkline, icon, onClick, loading, className = '', ...props
   }, ref) {
     const reduced = useReducedMotion();
     const interactive = !!onClick;
     const { ref: viewRef, inView } = useViewportEntryForStat();
     const { count, start } = useAnimatedCounterForStat(value);
 
-    // Start counter when in view
     if (inView) start();
 
-    const trendColor = trend === 'up'
-      ? 'text-green-600'
-      : trend === 'down'
-      ? 'text-red-500'
-      : 'text-gray-400';
+    const trendColor =
+      trend === 'up'   ? 'text-green-600' :
+      trend === 'down' ? 'text-red-500'   : 'text-gray-400';
 
     if (loading) {
       return (
@@ -587,56 +505,34 @@ export const CardStat = forwardRef<HTMLDivElement, CardStatProps>(
         className={`${cardVariants({ variant: 'flat', padding: 'md' })} ${interactive ? 'cursor-pointer' : ''} ${className}`}
         style={{ boxShadow: SHADOW_REST }}
         onClick={onClick}
-        whileHover={
-          interactive && !reduced
-            ? { y: -4, boxShadow: SHADOW_HOVER }
-            : undefined
-        }
-        whileTap={
-          interactive && !reduced
-            ? { y: 2, boxShadow: SHADOW_PRESSED, scale: 0.99 }
-            : undefined
-        }
+        whileHover={interactive && !reduced ? { y: -4, boxShadow: SHADOW_HOVER } : undefined}
+        whileTap={interactive && !reduced ? { y: 2, boxShadow: SHADOW_PRESSED, scale: 0.99 } : undefined}
         transition={{ duration: 0.2, ease: ease.float }}
         tabIndex={interactive ? 0 : undefined}
         role={interactive ? 'button' : undefined}
         {...props}
       >
-        <div
-          className="absolute top-0 left-3 right-3 h-px pointer-events-none z-10"
-          style={{ background: 'linear-gradient(90deg, transparent, oklch(1 0 0 / 0.45), transparent)' }}
-        />
+        <TopHighlight />
 
         <div className="relative z-[1] flex flex-col gap-2">
-          {/* Label row */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</span>
             {icon && <span className="text-gray-400 shrink-0">{icon}</span>}
           </div>
 
-          {/* Value */}
           <div className="flex items-baseline gap-1.5">
             <span className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums tracking-tight">
               {prefix}{count}{suffix}
             </span>
             {trend && trendLabel && (
               <span className={`text-xs font-bold ${trendColor} flex items-center gap-0.5`}>
-                {trend === 'up' && (
-                  <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
-                    <path d="M6 2l4 5H2l4-5z" />
-                  </svg>
-                )}
-                {trend === 'down' && (
-                  <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
-                    <path d="M6 10L2 5h8l-4 5z" />
-                  </svg>
-                )}
+                {trend === 'up'   && <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor"><path d="M6 2l4 5H2l4-5z" /></svg>}
+                {trend === 'down' && <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor"><path d="M6 10L2 5h8l-4 5z" /></svg>}
                 {trendLabel}
               </span>
             )}
           </div>
 
-          {/* Sparkline */}
           {sparkline && sparkline.length > 1 && (
             <div className="mt-1 h-8 w-full">
               <SparklineSVG data={sparkline} inView={inView} reduced={reduced} />
@@ -648,16 +544,9 @@ export const CardStat = forwardRef<HTMLDivElement, CardStatProps>(
   }
 );
 
-/* ── Sparkline SVG ── */
-function SparklineSVG({
-  data,
-  inView,
-  reduced,
-}: {
-  data: number[];
-  inView: boolean;
-  reduced: boolean;
-}) {
+/* ── Sparkline SVG ──
+   Draw animation via strokeDasharray/strokeDashoffset (no pathLength in style). */
+function SparklineSVG({ data, inView, reduced }: { data: number[]; inView: boolean; reduced: boolean }) {
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -666,9 +555,9 @@ function SparklineSVG({
   const pad = 2;
 
   const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * (w - pad * 2) + pad;
-    const y = h - pad - ((v - min) / range) * (h - pad * 2);
-    return `${x},${y}`;
+    const px = (i / (data.length - 1)) * (w - pad * 2) + pad;
+    const py = h - pad - ((v - min) / range) * (h - pad * 2);
+    return `${px},${py}`;
   });
 
   const pathD = `M${points.join(' L')}`;
@@ -677,7 +566,7 @@ function SparklineSVG({
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
       <defs>
         <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="oklch(0.55 0.24 270)" stopOpacity="0.15" />
+          <stop offset="0%"   stopColor="oklch(0.55 0.24 270)" stopOpacity="0.15" />
           <stop offset="100%" stopColor="oklch(0.55 0.24 270)" stopOpacity="0" />
         </linearGradient>
       </defs>
@@ -686,11 +575,9 @@ function SparklineSVG({
         d={`${pathD} L${w - pad},${h - pad} L${pad},${h - pad} Z`}
         fill="url(#sparkGrad)"
         opacity={inView ? 1 : 0}
-        style={{
-          transition: 'opacity 0.3s ease',
-        }}
+        style={{ transition: 'opacity 0.4s ease' }}
       />
-      {/* Line */}
+      {/* Line — draw animation via large strokeDasharray */}
       <path
         d={pathD}
         fill="none"
@@ -698,18 +585,15 @@ function SparklineSVG({
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{
-          strokeDasharray: 1,
-          strokeDashoffset: inView ? 0 : 1,
-          pathLength: 1,
-          transition: reduced ? 'none' : 'stroke-dashoffset 0.8s ease-out',
-        }}
+        strokeDasharray="800"
+        strokeDashoffset={inView ? 0 : 800}
+        style={{ transition: reduced ? 'none' : 'stroke-dashoffset 0.8s ease-out' }}
       />
     </svg>
   );
 }
 
-/* ── Re-wrap hooks to avoid circular imports. Simple wrappers. ── */
+/* ── Wrappers for hooks ── */
 import { useViewportEntry, useAnimatedCounter } from '../animations/hooks';
 
 function useViewportEntryForStat() {
